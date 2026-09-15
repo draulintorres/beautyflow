@@ -1091,7 +1091,6 @@ function InquilinoTableRow({
 
 // ── Page principal ─────────────────────────────────────────
 export function CuentasPorCobrarPage() {
-  const qc = useQueryClient();
   const authUser = useAuthStore(s => s.user);
   const puedeVerInquilinos = OWNER_ADMIN.has(authUser?.rol ?? '');
 

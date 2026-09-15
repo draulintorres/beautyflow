@@ -20,7 +20,6 @@ import { CatalogoPage }     from './features/catalogo/CatalogoPage';
 import { ReportesPage }     from './features/reportes/ReportesPage';
 import { UsuariosPage }     from './features/usuarios/UsuariosPage';
 import { SucursalesPage }   from './features/sucursales/SucursalesPage';
-import { EmpleadosPage }    from './features/empleados/EmpleadosPage';
 import { EquipoPage }             from './features/equipo/EquipoPage';
 import { AjustesPage }            from './features/ajustes/AjustesPage';
 import { CuentasPorCobrarPage }   from './features/cuentas-por-cobrar/CuentasPorCobrarPage';
