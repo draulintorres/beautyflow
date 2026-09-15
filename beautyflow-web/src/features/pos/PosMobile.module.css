@@ -1,0 +1,227 @@
+.wrap { min-height: 100%; display: flex; flex-direction: column; padding-bottom: 60px; width: 100%; box-sizing: border-box; overflow-x: hidden; }
+.header { padding: 18px 18px 4px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.header h1 { font-size: 23px; font-weight: 800; }
+.header p { font-size: 13px; color: var(--gold-text); margin-top: 2px; }
+.historialBtn {
+  flex-shrink: 0; background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 9px 13px; font-size: 12.5px; font-weight: 600;
+  color: var(--gold-text); cursor: pointer; font-family: var(--font-body); margin-top: 2px;
+}
+
+.cajaBarWrap { padding: 10px 16px 0; }
+.cajaBarWrap > div { margin-bottom: 0; }
+
+.tabs { display: flex; gap: 8px; padding: 8px 16px; }
+.tab, .tabOn { flex: 1; padding: 10px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: var(--font-body); }
+.tabOn { background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep)); color: #1a1407; border-color: var(--gold); }
+
+.search { padding: 4px 16px 10px; }
+.search input { width: 100%; box-sizing: border-box; background: var(--field, var(--surface-2)); border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; color: var(--text); font-size: 14px; font-family: var(--font-body); outline: none; }
+.search input:focus { border-color: var(--gold); }
+
+/* ─── Catálogo ─── */
+.catalogo { flex: 1; padding: 0 16px 80px; display: flex; flex-direction: column; gap: 9px; }
+.item { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 13px 14px; width: 100%; box-sizing: border-box; }
+.itemOff { opacity: .45; }
+.itemInfo { flex: 1; min-width: 0; }
+.itemNom { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itemCat { font-size: 11.5px; color: var(--muted); }
+.itemPrecio { font-size: 13.5px; font-weight: 700; color: var(--gold-text); font-family: var(--font-mono); white-space: nowrap; flex-shrink: 0; }
+.addBtn { width: 34px; height: 34px; border-radius: 10px; background: rgba(201,162,75,.14); border: 1px solid var(--gold); color: var(--gold-text); font-size: 22px; cursor: pointer; flex-shrink: 0; display: grid; place-items: center; line-height: 1; font-family: var(--font-body); }
+.addBtn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ─── Barra carrito ─── */
+.cartBar {
+  position: fixed; left: 12px; right: 12px;
+  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
+  color: #1a1407; border: none; border-radius: 14px; padding: 14px 18px;
+  cursor: pointer; z-index: 60;
+  box-shadow: 0 8px 24px rgba(201,162,75,.35);
+  font-family: var(--font-body);
+}
+.cartCount { font-weight: 700; font-size: 13px; flex-shrink: 0; }
+.cartTotal { font-weight: 800; font-size: 16px; flex: 1; text-align: left; font-family: var(--font-mono); }
+.cartCta { font-weight: 700; font-size: 13.5px; flex-shrink: 0; }
+
+/* ─── Overlay + sheet ─── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 300; display: flex; align-items: flex-end; }
+.sheet {
+  background: var(--surface); border-top: 1px solid var(--line);
+  border-radius: 22px 22px 0 0; width: 100%;
+  padding: 12px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 14px;
+  max-height: 90vh; overflow-y: auto;
+}
+.handle { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto; }
+.sheet h3 { font-size: 18px; font-weight: 700; }
+
+/* ─── Cliente ─── */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12.5px; color: var(--muted); }
+.field select, .empSel {
+  background: var(--field, var(--surface-2)); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px; color: var(--text);
+  font-size: 14px; font-family: var(--font-body); width: 100%; box-sizing: border-box;
+}
+
+/* ─── Líneas ─── */
+.lineas { display: flex; flex-direction: column; gap: 10px; }
+.linea { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+.lineaTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lineaNom { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lineaDel { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; flex-shrink: 0; }
+.lineaBot { display: flex; align-items: center; justify-content: space-between; }
+.qty { display: flex; align-items: center; gap: 14px; }
+.qty button { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font-size: 18px; cursor: pointer; display: grid; place-items: center; }
+.qty span { font-size: 15px; font-weight: 700; min-width: 18px; text-align: center; }
+.lineaPrecio { font-size: 14px; font-weight: 700; color: var(--gold-text); font-family: var(--font-mono); }
+
+/* ─── Totales ─── */
+.totales { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+.totRow { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--muted); }
+.totRow b { color: var(--text); font-family: var(--font-mono); }
+.totRowBig { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; padding-top: 6px; }
+.totRowBig b { color: var(--gold-text); font-family: var(--font-mono); }
+
+/* ─── Botón cobrar ─── */
+.cobrarBtn {
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
+  color: #1a1407; border: none; border-radius: 13px; padding: 15px;
+  font-size: 15.5px; font-weight: 700; cursor: pointer; font-family: var(--font-body);
+}
+.cobrarBtn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ─── Pago mixto ─── */
+.pagosList { display: flex; flex-direction: column; gap: 8px; }
+.pagoItem { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; }
+.pagoItem button { background: none; border: none; color: var(--err); cursor: pointer; font-size: 14px; }
+.pagoResumen { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 2px; }
+.restanteWarn { color: var(--warn); font-weight: 700; }
+.restanteOk { color: var(--ok); font-weight: 700; }
+
+.pagoForm { display: flex; flex-direction: column; gap: 11px; }
+.metodos { display: flex; gap: 8px; }
+.metodo { flex: 1; padding: 11px 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: var(--font-body); }
+.metodoOn { border-color: var(--gold); color: var(--gold-text); background: rgba(201,162,75,.1); }
+.montoLbl { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); }
+.montoLbl input { background: var(--field, var(--surface-2)); border: 1px solid var(--line); border-radius: 10px; padding: 12px; color: var(--text); font-size: 16px; font-family: var(--font-mono); outline: none; width: 100%; box-sizing: border-box; }
+.montoLbl input:focus { border-color: var(--gold); }
+.cambio { font-size: 14px; color: var(--ok); font-weight: 700; }
+.addPagoBtn { background: var(--surface-2); border: 1px solid var(--gold); color: var(--gold-text); border-radius: 11px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: var(--font-body); }
+
+/* ─── Fiao ─── */
+.fiaoRow { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--text); padding: 4px 0; cursor: pointer; }
+.fiaoRow input { width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer; }
+
+/* ─── Toast ─── */
+.toast {
+  position: fixed; left: 16px; right: 16px;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border: 1px solid var(--gold);
+  color: var(--text); border-radius: 12px; padding: 14px 16px;
+  font-size: 13.5px; text-align: center; z-index: 400;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+
+/* ─── Banner de recibo tras cobrar ─── */
+.reciboBanner {
+  position: fixed; left: 16px; right: 16px;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border: 1px solid var(--gold);
+  color: var(--text); border-radius: 12px; padding: 12px 14px;
+  font-size: 13px; font-weight: 600; z-index: 401;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  flex-wrap: wrap;
+}
+.reciboBannerActions { display: flex; align-items: center; gap: 6px; }
+.reciboBannerActions button {
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 11px; font-size: 12.5px; font-weight: 600;
+  color: var(--gold-text); cursor: pointer; font-family: var(--font-body);
+  white-space: nowrap;
+}
+.reciboBannerClose {
+  background: none !important; border: none !important; color: var(--muted) !important;
+  padding: 4px !important; font-size: 15px !important;
+}
+
+/* ─── Chip del cliente en header factura ─── */
+.clienteChip { font-size: 12px; font-weight: 600; background: rgba(201,162,75,.15); color: var(--gold-text); border-radius: 20px; padding: 3px 10px; margin-left: 10px; vertical-align: middle; }
+
+/* ─── Número de línea ─── */
+.lineaNum { font-size: 11px; color: var(--muted); font-family: var(--font-mono); flex-shrink: 0; width: 16px; }
+
+/* ─── Descuento en totales ─── */
+.descVal { color: var(--ok); }
+
+/* ─── Barra de acciones ─── */
+.accionesBar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.accionBtn, .accionBtnDanger { display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; cursor: pointer; font-size: 11px; font-family: var(--font-body); padding: 8px 4px; }
+.accionBtn { color: var(--text); }
+.accionBtnDanger { color: var(--err); }
+.accionBtn svg { width: 20px; height: 20px; stroke: var(--gold-soft); fill: none; stroke-width: 1.7; }
+.accionBtnDanger svg { width: 20px; height: 20px; stroke: var(--err); fill: none; stroke-width: 1.7; }
+
+/* ─── Mini-sheet (descuento / cliente) ─── */
+.sheetSm { background: var(--surface); border-top: 1px solid var(--line); border-radius: 22px 22px 0 0; width: 100%; padding: 12px 18px calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; max-height: 80vh; overflow-y: auto; }
+.sheetSm h3 { font-size: 17px; font-weight: 700; }
+
+/* ─── Buscador y lista de clientes ─── */
+.cliBusca { background: var(--field, var(--surface-2)); border: 1px solid var(--line); border-radius: 10px; padding: 11px; color: var(--text); font-size: 14px; font-family: var(--font-body); outline: none; }
+.cliBusca:focus { border-color: var(--gold); }
+.cliList { display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; }
+.cliItem { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 12px; cursor: pointer; font-family: var(--font-body); text-align: left; }
+.cliItemSel { border-color: var(--gold); background: rgba(201,162,75,.08); }
+.cliNom { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.moroso { font-size: 9.5px; font-weight: 700; background: rgba(216,80,58,.16); color: var(--err); padding: 2px 7px; border-radius: 10px; }
+.cliCredito { font-size: 11.5px; color: var(--ok); }
+
+/* ─── Fiao aviso ─── */
+.fiaoWarn { font-size: 12px; color: var(--warn); padding: 4px 2px; }
+
+/* ─── Selector empleado con aviso ─── */
+.empSelWarn { border-color: rgba(230,165,40,.55) !important; color: #d4a32a; }
+
+/* ─── Advertencia servicios sin empleado ─── */
+.warnHead { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 700; color: #d4a32a; }
+.warnHead svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.warnBody { font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+.warnFoot { display: flex; gap: 10px; align-items: stretch; }
+.warnBack { flex: 1; font-size: 13.5px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 13px; padding: 13px; cursor: pointer; font-family: var(--font-body); font-weight: 600; }
+
+/* ── Historial de ventas (Parte A) ── */
+.loadWrap { display: flex; justify-content: center; padding: 40px; }
+.spinner { width: 22px; height: 22px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: spinHist .7s linear infinite; }
+@keyframes spinHist { to { transform: rotate(360deg); } }
+.tabEmpty { text-align: center; color: var(--muted); font-size: 13px; padding: 30px; }
+.err { background: rgba(216,80,58,.12); border: 1px solid rgba(216,80,58,.3); border-radius: 10px; padding: 11px; font-size: 13px; color: var(--err); }
+
+.histList { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.histRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px;
+}
+.histRowAnulada { opacity: .55; }
+.histInfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.histFactura { font-size: 12.5px; font-weight: 700; font-family: var(--font-mono); }
+.histCli { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.histRowAnulada .histCli { text-decoration: line-through; }
+.histRight { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.histTotal { font-family: var(--font-mono); font-size: 13px; color: var(--gold-text); display: flex; align-items: center; gap: 6px; }
+.histRowAnulada .histTotal { text-decoration: line-through; }
+.histBadge {
+  text-decoration: none; font-family: var(--font-body); font-size: 9px; font-weight: 700;
+  color: var(--err); background: rgba(216,80,58,.14); border: 1px solid rgba(216,80,58,.3);
+  border-radius: 5px; padding: 1px 5px;
+}
+.histActs { display: flex; gap: 6px; }
+.histActs button {
+  width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(201,162,75,.3);
+  background: transparent; color: var(--gold-text); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; padding: 0;
+}
+.histActs button svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.histAnularBtn { border-color: rgba(216,80,58,.3) !important; color: var(--err) !important; }

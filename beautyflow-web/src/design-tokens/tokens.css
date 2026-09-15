@@ -1,0 +1,297 @@
+/* =========================================================================
+   Estixa — Design Tokens
+   Sistema de diseño unificado. Importar en el root del proyecto React.
+   Uso: import './design-tokens/tokens.css' en main.tsx
+   ========================================================================= */
+
+:root {
+  /* Tema oscuro = default (comportamiento idéntico al de antes de esto).
+     color-scheme le dice al navegador en qué modo renderizar los controles
+     NATIVOS (selects, date/time pickers, scrollbars). Antes estaba fijo en
+     "dark" siempre — ahora cambia junto con [data-theme] más abajo. Si esto
+     se desincroniza del tema activo, reaparece el bug del <select> con
+     fondo blanco del sistema y texto claro invisible. */
+  color-scheme: dark;
+
+  /* ---- COLORES: superficies ---- */
+  --bg:           #0a0a0b;   /* fondo principal de la app */
+  --surface:      #141416;   /* tarjetas, paneles */
+  --surface-2:    #1a1a1d;   /* superficie elevada / hover */
+  --field:        #1c1c1f;   /* inputs, campos de búsqueda */
+  --surface-deep: #101012;   /* extremo oscuro de degradados decorativos (KpiCard, etc.) */
+  --select-opt-bg: #1a1910;  /* fondo de <option> en selects con estilo propio (SuperAdmin) */
+  --glass-bg: rgba(14, 14, 16, 0.95);  /* headers/barras translúcidas con blur (Topbar, MobileNav) */
+
+  /* ---- COLORES: sidebar (degradado propio, no es --surface) ---- */
+  --sidebar-1: #121214;
+  --sidebar-2: #0c0c0d;
+
+  /* ---- COLORES: marca (dorado) ---- */
+  --gold:         #C9A24B;   /* dorado principal */
+  --gold-soft:    #E4CB8A;   /* dorado claro (texto sobre oscuro, highlights) */
+  --gold-deep:    #a07f33;   /* dorado profundo (degradados, sombras) */
+  /* Dorado usado como COLOR DE TEXTO (nav activo, valores destacados,
+     montos, nombre de marca, etc.) — separado de --gold/--gold-soft porque
+     esos dos también se usan como FONDO en botones/badges/gradientes
+     dorados, que deben seguir dorados en ambos temas. En oscuro es igual a
+     --gold-soft (mismo look de siempre); en claro se redefine a negro más
+     abajo — así el texto cambia sin tocar ningún fondo/botón dorado. */
+  --gold-text:    #E4CB8A;
+
+  /* ---- COLORES: texto ---- */
+  --text:         #FFFFFF;
+  --muted:        #9a988f;   /* texto secundario, labels */
+  --muted-faint:  #5e5d57;   /* placeholders, texto muy secundario (más apagado que --muted) */
+  --line:         rgba(255,255,255,.08);  /* bordes, divisores */
+
+  /* ---- COLORES: semánticos ---- */
+  --ok:           #1D9E75;   /* éxito, confirmada, pagada */
+  --warn:         #d9a531;   /* alerta, pendiente */
+  --err:          #D8503A;   /* error, cancelada, vencida */
+  --info:         #3878C7;   /* información, en proceso */
+  --purple:       #8b6fc7;   /* completada, membresías */
+
+  /* ---- COLORES: SuperAdmin (paleta propia, distinta a la del tenant) ----
+     SuperAdmin usa sus propios tonos de éxito/error/alerta (ligeramente
+     distintos a --ok/--err/--warn de arriba) — se migran a tokens propios
+     en vez de a --ok/--err/--warn para no correr el degradado oscuro que
+     esos otros tonos tendrían si se reusaran los del tenant. */
+  --sa-ok:        #4fd1a8;   /* activa, pagada */
+  --sa-err:       #e07868;   /* cancelada, vencida, peligro (texto/ícono) */
+  --sa-err-solid: #c0392b;   /* fondo sólido de botón de peligro */
+  --sa-warn:      #e6a06a;   /* suspendida */
+  --sa-pending:   #e6b446;   /* pendiente de pago */
+
+  /* ---- ESTADOS DE CITA (colores fijos del negocio) ---- */
+  --st-confirmada: #1D9E75;  /* 🟢 */
+  --st-pendiente:  #d9a531;  /* 🟡 */
+  --st-proceso:    #3878C7;  /* 🔵 En proceso */
+  --st-completada: #8b6fc7;  /* 🟣 */
+  --st-cancelada:  #D8503A;  /* 🔴 */
+  --st-nollego:    #6b6a64;  /* ⚫ No llegó (antes "No Show") */
+
+  /* ---- GRÁFICOS: paleta categórica ----
+     8 tonos con buena diferenciación entre sí (no tonos de dorado) y
+     validados para daltonismo y contraste contra --surface en ambos temas.
+     Orden fijo — asignar por posición, nunca ciclar. Estos son los valores
+     de tema OSCURO; el claro se redefine en el bloque [data-theme="light"].
+     Fuente: paleta de referencia del skill dataviz. */
+  --chart-1: #3987e5;  /* azul */
+  --chart-2: #d95926;  /* naranja */
+  --chart-3: #199e70;  /* verde agua */
+  --chart-4: #c98500;  /* dorado/ámbar */
+  --chart-5: #d55181;  /* magenta */
+  --chart-6: #008300;  /* verde */
+  --chart-7: #9085e9;  /* violeta */
+  --chart-8: #e66767;  /* rojo */
+  --chart-track: var(--surface-2);  /* aro de fondo del donut / vacío */
+  --gauge-track: rgba(255,255,255,.13);  /* aro de fondo de anillos de progreso (se ve sobre degradados) */
+
+  /* ---- TIPOGRAFÍA (una sola familia: Inter) ---- */
+  --font-body:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;  /* SOLO datos: precios, horas, códigos, folios */
+
+  /* Pesos */
+  --fw-regular:   400;
+  --fw-medium:    500;
+  --fw-semibold:  600;
+  --fw-bold:      700;
+  --fw-extrabold: 800;
+
+  /* Escala tipográfica */
+  --fs-xs:        11px;
+  --fs-sm:        12.5px;
+  --fs-base:      13.5px;
+  --fs-md:        15px;
+  --fs-lg:        18px;
+  --fs-xl:        23px;
+  --fs-2xl:       27px;
+
+  /* ---- ESPACIADO ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+
+  /* ---- RADIOS ---- */
+  --r-sm:  8px;
+  --r-md:  10px;
+  --r-lg:  13px;
+  --r-xl:  16px;
+  --r-pill: 20px;
+
+  /* ---- LAYOUT ---- */
+  --sidebar-w: 244px;
+  --topbar-h:  62px;
+
+  /* ---- SOMBRAS ---- */
+  --shadow-gold: 0 8px 24px rgba(201,162,75,.28);
+  --shadow-card: 0 6px 18px rgba(0,0,0,.4);
+}
+
+/* =========================================================================
+   TEMA CLARO — activado con <html data-theme="light">, puesto por
+   src/store/theme.ts (localStorage, por dispositivo — ver ese archivo).
+   Solo redefine los tokens de COLOR; tipografía, espaciado, radios, etc.
+   quedan igual en ambos temas.
+
+   No es una simple inversión mecánica: los tokens que existían con un ROL
+   de "texto/acento sobre fondo oscuro" (--gold-soft, y los semánticos que
+   son bastante claros como --warn) se oscurecen aquí para mantener buen
+   contraste sobre fondos claros — no solo se invierten. Los colores de
+   marca/semánticos que ya eran suficientemente oscuros/saturados
+   (--gold-deep, --ok, --err, --info, --purple) se mantienen o se ajustan
+   apenas.
+   ========================================================================= */
+:root[data-theme="light"] {
+  /* Mismo mecanismo que color-scheme: dark de arriba, pero para claro —
+     esto es lo que evita que reaparezca el bug del <select> en blanco: le
+     dice al navegador que los controles nativos también deben pintarse en
+     modo claro (texto oscuro por defecto), en vez de quedar pintados en
+     modo oscuro con estilos claros encima. */
+  color-scheme: light;
+
+  /* ---- COLORES: superficies ---- */
+  --bg:           #F7F5F0;   /* off-white cálido, no blanco puro (menos fatiga visual) */
+  --surface:      #FFFFFF;   /* tarjetas, paneles */
+  --surface-2:    #F0ECE3;   /* superficie elevada / hover */
+  --field:        #FFFFFF;   /* inputs, campos de búsqueda (con borde --line) */
+  --surface-deep: #EAE3D3;   /* extremo de degradados decorativos */
+  --select-opt-bg: #FFFFFF;
+  --glass-bg: rgba(247, 245, 240, 0.92);
+
+  /* ---- COLORES: sidebar ---- */
+  --sidebar-1: #FFFFFF;
+  --sidebar-2: #F1ECE0;
+
+  /* ---- COLORES: marca (dorado) ---- */
+  /* --gold/--gold-soft/--gold-deep quedan con el MISMO dorado de marca que
+     en oscuro — ya no se usan como color de texto (ver --gold-text abajo),
+     solo como fondo de botones/badges/degradados, así que no necesitan
+     oscurecerse por contraste. */
+  --gold:         #C9A24B;
+  --gold-soft:    #E4CB8A;
+  --gold-deep:    #a07f33;
+  /* El texto que antes se veía dorado pasa a negro/gris muy oscuro en
+     claro (pedido explícito) — igual al color de texto normal de la
+     página, para que no desentone. */
+  --gold-text:    #1C1B18;
+
+  /* ---- COLORES: texto ---- */
+  --text:         #1C1B18;
+  --muted:        #6b6a64;
+  --muted-faint:  #A6A296;
+  --line:         rgba(0,0,0,.10);
+
+  /* ---- COLORES: semánticos (oscurecidos lo necesario para contraste AA) ---- */
+  --ok:           #157A57;
+  --warn:         #9C6E0E;
+  --err:          #C0392B;
+  --info:         #2A5D9C;
+  --purple:       #6A4FA0;
+
+  /* ---- COLORES: SuperAdmin (oscurecidos, misma lógica que arriba) ---- */
+  --sa-ok:        #0F8A63;
+  --sa-err:       #B8402E;
+  --sa-err-solid: #c0392b;   /* botón sólido: mismo rojo en los dos temas */
+  --sa-warn:      #A05A1E;
+  --sa-pending:   #8A6510;
+
+  /* ---- ESTADOS DE CITA ---- */
+  --st-confirmada: #157A57;
+  --st-pendiente:  #9C6E0E;
+  --st-proceso:    #2A5D9C;
+  --st-completada: #6A4FA0;
+  --st-cancelada:  #C0392B;
+  --st-nollego:    #6b6a64;
+
+  /* ---- GRÁFICOS: paleta categórica (tema claro, validada vs #FFFFFF) ---- */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+  --chart-7: #4a3aa7;
+  --chart-8: #e34948;
+  --chart-track: var(--surface-2);
+  --gauge-track: rgba(30,25,15,.16);
+
+  --shadow-gold: 0 8px 24px rgba(156,122,40,.22);
+  --shadow-card: 0 6px 18px rgba(30,25,15,.10);
+}
+
+/* =========================================================================
+   GRADIENTES REUTILIZABLES (clases utilitarias)
+   ========================================================================= */
+
+/* Botón / acento dorado principal */
+.bf-gradient-gold {
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
+  color: #1a1407;
+}
+
+/* Avatar dorado */
+.bf-avatar-gold {
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  color: #1a1407;
+}
+
+/* Sidebar */
+.bf-sidebar-bg {
+  background: linear-gradient(180deg, #121214, #0c0c0d);
+}
+
+/* =========================================================================
+   RESET BÁSICO sugerido
+   ========================================================================= */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* =========================================================================
+   ANTI-ZOOM iOS — Safari hace zoom automático al enfocar un input/textarea/
+   select con font-size menor a 16px, y a veces no regresa al tamaño normal,
+   dejando toda la app desalineada. Forzamos 16px en TODOS los campos de
+   formulario solo en mobile (no afecta el tamaño de texto normal del resto
+   del diseño, ni el desktop).
+   ========================================================================= */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* =========================================================================
+   SCROLLBARS — finas y doradas, tema oscuro
+   ========================================================================= */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201,162,75,.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(201,162,75,.28);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(201,162,75,.5);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

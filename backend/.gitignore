@@ -1,0 +1,31 @@
+# Dependencias / build
+node_modules/
+dist/
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Respaldos de base de datos — pueden contener datos reales
+backups/
+_backups/
+*.dump
+
+# Scripts sueltos de depuración de rondas anteriores (no son parte del
+# proyecto — quedaron del historial de desarrollo, no aportan a un
+# clon nuevo del repo)
+backfill-modulos.mjs
+list-users.mjs
+p8-delete.mjs
+p8-restore.mjs
+query-planes.mjs
+test-fallback.mjs
+prisma/query-ana.ts
+
+# Documento de auditoría de una fase anterior (histórico, con branding
+# viejo — no aporta a alguien clonando el repo hoy)
+AUDITORIA_FASE_9_5.md

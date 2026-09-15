@@ -1,0 +1,466 @@
+/* ══════════════════════════════════════
+   PASO 1 — página con hero de salón
+   ══════════════════════════════════════ */
+
+.page1 {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* ── Hero / Collage ── */
+.hero {
+  position: relative;
+  height: 315px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.collage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+}
+
+.tile {
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.42) saturate(0.9);
+}
+.t1 { background-image: url('https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&q=70'); }
+.t2 { background-image: url('https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=400&q=70'); }
+.t3 { background-image: url('https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400&q=70'); }
+.t4 { background-image: url('https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=400&q=70'); }
+.t5 { background-image: url('https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=400&q=70'); }
+.t6 { background-image: url('https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&q=70'); }
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse 90% 90% at 50% 45%, rgba(201,162,75,.2), transparent 65%),
+    linear-gradient(180deg, rgba(0,0,0,.28) 0%, rgba(10,10,11,.55) 60%, #0a0a0b 100%);
+}
+
+/* Botones sobre el hero con foto: el hero SIEMPRE tiene un scrim oscuro
+   encima (heroOverlay), sin importar el tema activo — a propósito, ver
+   nota en heroOverlay más abajo. Por eso estos NO usan var(--text)/
+   var(--muted) (que cambian de valor según el tema y quedarían oscuros
+   sobre oscuro en tema claro): usan blancos fijos, igual en ambos temas. */
+.langBtn {
+  position: absolute;
+  top: 14px; right: 16px; z-index: 3;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  padding: 5px 11px;
+  color: rgba(255,255,255,.75);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: border-color .15s;
+}
+.langBtn:hover { border-color: rgba(201,162,75,.4); color: var(--gold-text); }
+
+.themeBtnHero {
+  position: absolute;
+  top: 14px; left: 16px; z-index: 3;
+  width: 30px; height: 30px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  display: grid; place-items: center;
+  color: rgba(255,255,255,.75);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.themeBtnHero:hover { border-color: rgba(201,162,75,.4); color: var(--gold-text); }
+.themeBtnHero svg { width: 16px; height: 16px; }
+
+/* Centro del hero */
+.heroCenter {
+  position: absolute;
+  inset: 0; z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 20px 0;
+  text-align: center;
+  gap: 0;
+}
+
+/* Badge del logo */
+.logoBadge {
+  width: 72px; height: 72px;
+  border-radius: 20px;
+  background: rgba(0,0,0,.45);
+  border: 1px solid rgba(201,162,75,.4);
+  box-shadow: 0 0 24px rgba(201,162,75,.2);
+  display: grid; place-items: center;
+  margin-bottom: 10px;
+}
+
+/* Texto de marca */
+.brandWord {
+  font-size: 31px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .5px;
+}
+.flow {
+  background: linear-gradient(180deg, #f4e4b8, var(--gold) 55%, var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brandSub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 9px;
+}
+.brandSub span {
+  font-size: 9.5px;
+  letter-spacing: 2.5px;
+  color: var(--gold-text);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.lineL {
+  height: 1px; width: 30px;
+  background: linear-gradient(90deg, transparent, var(--gold));
+  display: block;
+}
+.lineR {
+  height: 1px; width: 30px;
+  background: linear-gradient(90deg, var(--gold), transparent);
+  display: block;
+}
+
+.tagline {
+  font-size: 12.5px;
+  color: rgba(220,215,200,.82);
+  line-height: 1.45;
+}
+.tagline b { color: var(--gold-text); font-weight: 600; }
+
+/* ── Formulario paso 1 ── */
+.body {
+  flex: 1;
+  padding: 10px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg);
+}
+
+.hola { font-size: 22px; font-weight: 700; }
+.lead {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: -6px;
+}
+
+/* Input con ícono */
+.inputWrap { position: relative; }
+.inputIco {
+  position: absolute;
+  left: 13px; top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 16px;
+  stroke: var(--muted); fill: none;
+  pointer-events: none;
+}
+.input {
+  width: 100%;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px 13px 13px 42px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font-body);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color .18s;
+}
+.input:focus { border-color: var(--gold); }
+.input::placeholder { color: var(--muted); }
+
+/* Error */
+.err { color: var(--err); font-size: 12px; margin-top: -4px; }
+
+/* Botón principal dorado */
+.btnPrimary {
+  width: 100%;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
+  color: #1a1407;
+  border: none;
+  border-radius: 13px;
+  padding: 15px;
+  font-size: 15px; font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font-body);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 8px 24px rgba(201,162,75,.22);
+  transition: opacity .15s;
+}
+.btnPrimary:disabled { opacity: .55; cursor: not-allowed; }
+.btnPrimary:hover:not(:disabled) { opacity: .9; }
+
+/* Spinner */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(26,20,7,.25);
+  border-top-color: #1a1407;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* OAuth próximamente */
+.oauthMsg {
+  text-align: center;
+  font-size: 12px;
+  background: rgba(201,162,75,.1);
+  border: 1px solid rgba(201,162,75,.25);
+  border-radius: 9px;
+  padding: 7px 12px;
+  color: var(--gold-text);
+  margin-top: -4px;
+}
+
+/* Divisor */
+.divider {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--muted); font-size: 12px;
+}
+.divider::before, .divider::after {
+  content: ''; height: 1px; flex: 1;
+  background: var(--line);
+}
+
+/* Botones sociales */
+.socials { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.soc {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 11px;
+  font-size: 13.5px; color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: border-color .15s;
+}
+.soc:hover { border-color: rgba(201,162,75,.4); }
+
+/* Íconos de características */
+.features {
+  display: flex; justify-content: center; gap: 28px;
+  padding: 4px 0;
+}
+.feat {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--muted);
+}
+.feat svg { stroke: var(--gold-soft); fill: none; }
+
+.secured {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -4px;
+}
+
+
+/* ══════════════════════════════════════
+   PASO 2 — pantalla de verificación
+   ══════════════════════════════════════ */
+
+.page2 {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* Top bar con back + ayuda */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 0;
+}
+
+.backBtn {
+  width: 36px; height: 36px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  display: grid; place-items: center;
+}
+.backBtn svg { width: 18px; height: 18px; stroke: var(--text); fill: none; }
+
+.ayudaBtn {
+  display: flex; align-items: center; gap: 5px;
+  background: none; border: none;
+  color: var(--muted); font-size: 12.5px;
+  cursor: pointer; font-family: var(--font-body);
+}
+.ayudaBtn:hover { color: var(--text); }
+
+.topBarRight { display: flex; align-items: center; gap: 12px; }
+.themeBtn {
+  width: 30px; height: 30px;
+  background: none; border: 1px solid var(--line);
+  border-radius: 8px; cursor: pointer;
+  display: grid; place-items: center;
+  color: var(--muted);
+}
+.themeBtn:hover { color: var(--gold-text); }
+.themeBtn svg { width: 15px; height: 15px; }
+
+/* Cuerpo del paso 2 */
+.p2Body {
+  flex: 1;
+  padding: 20px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* Ícono escudo */
+.shieldWrap {
+  width: 62px; height: 62px;
+  border-radius: 18px;
+  background: rgba(201,162,75,.1);
+  border: 1px solid rgba(201,162,75,.3);
+  box-shadow: 0 0 20px rgba(201,162,75,.12);
+  display: grid; place-items: center;
+  margin-bottom: 2px;
+}
+.shieldWrap svg { width: 30px; height: 30px; stroke: var(--gold-soft); }
+
+.verTitle { font-size: 23px; font-weight: 700; text-align: center; }
+.verSub {
+  font-size: 13.5px; color: var(--muted);
+  text-align: center; line-height: 1.45;
+  margin-top: -8px;
+}
+
+/* Fila con destino y editar */
+.destinoRow {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 10px 14px;
+  width: 100%;
+}
+.destinoTxt {
+  font-size: 13.5px; font-weight: 500;
+  flex: 1; text-align: center;
+}
+.editBtn {
+  background: none; border: none; cursor: pointer;
+  display: grid; place-items: center; padding: 2px;
+}
+.editBtn svg { stroke: var(--muted); }
+.editBtn:hover svg { stroke: var(--gold-soft); }
+
+/* Caja de dev OTP */
+.devBox {
+  background: rgba(56,120,199,.1);
+  border: 1px solid rgba(56,120,199,.32);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 12px; color: var(--info);
+  line-height: 1.5; text-align: center;
+  width: 100%;
+}
+.devBox b { font-family: var(--font-mono); font-size: 14px; letter-spacing: 2px; }
+
+/* 6 cajas de dígitos OTP */
+.otpRow {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 4px 0;
+}
+.otpBox {
+  width: 42px; height: 54px;
+  background: var(--field);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  text-align: center;
+  font-size: 24px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text);
+  outline: none;
+  caret-color: transparent;
+  transition: border-color .15s, background .15s;
+}
+.otpBox:focus {
+  border-color: var(--gold);
+  background: rgba(201,162,75,.07);
+}
+.otpFilled { border-color: rgba(201,162,75,.55); }
+
+/* Texto del temporizador */
+.timerTxt {
+  font-size: 12.5px; color: var(--muted);
+  text-align: center; margin-top: -4px;
+}
+.timerTxt b { color: var(--warn); font-family: var(--font-mono); }
+
+/* Botón secundario (reenviar) */
+.btnSecondary {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 13px;
+  font-size: 13.5px; font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-body);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: border-color .15s, color .15s;
+}
+.btnSecondary:not(:disabled):hover { border-color: rgba(201,162,75,.4); color: var(--text); }
+.btnSecondary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Footer de seguridad */
+.verFooter {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+.secureMsg {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+}
+.helpMsg {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+  cursor: pointer;
+  text-decoration: none;
+}
+.helpMsg b { color: var(--text); font-weight: 500; }

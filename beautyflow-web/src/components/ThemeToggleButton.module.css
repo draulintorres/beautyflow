@@ -1,0 +1,20 @@
+.btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 6px;
+  border-radius: var(--r-sm);
+  display: grid;
+  place-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.btn:hover {
+  color: var(--gold-text);
+  background: var(--surface-2);
+}
+.btn svg {
+  width: 18px;
+  height: 18px;
+}

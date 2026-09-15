@@ -1,0 +1,125 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(480px, 70vh);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+
+.marcarTodas {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gold-text);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  padding: 2px 4px;
+}
+.marcarTodas:hover {
+  color: var(--gold);
+}
+.marcarTodas:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lista {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.estadoVacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+.estadoVacio svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.6;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.item:last-child {
+  border-bottom: none;
+}
+.item:hover {
+  background: var(--surface-2);
+}
+
+.itemDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+  background: transparent;
+}
+.noLeida {
+  background: rgba(201, 162, 75, 0.07);
+}
+.noLeida .itemDot {
+  background: var(--gold);
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemTitulo {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+
+.itemCuerpo {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.itemTiempo {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  opacity: 0.8;
+}

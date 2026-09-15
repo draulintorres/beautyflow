@@ -1,0 +1,142 @@
+.page { display: flex; flex-direction: column; gap: 14px; }
+
+.loadingWrap {
+  display: flex; align-items: center; justify-content: center;
+  gap: 12px; height: 60vh;
+}
+.spinner {
+  width: 22px; height: 22px;
+  border: 2px solid var(--line);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Greeting ─── */
+.greet h2 { font-weight: var(--fw-semibold); font-size: var(--fs-2xl); }
+.greet p  { color: var(--muted); font-size: var(--fs-sm); margin-top: 2px; }
+
+/* ─── KPI grids ─── */
+.kpiGrid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.kpiGrid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: 560px; }
+
+/* ─── Panels ─── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 18px;
+}
+.panelHead {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.panelTitle { font-weight: var(--fw-semibold); font-size: 18px; }
+.sel {
+  font-size: 11.5px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 10px; cursor: pointer;
+}
+.more {
+  font-size: 12px; color: var(--gold); cursor: pointer;
+  font-family: var(--font-mono);
+  background: none; border: none; padding: 0;
+}
+.more:hover { text-decoration: underline; }
+
+.emptyMsg { font-size: var(--fs-sm); color: var(--muted); padding: 12px 0; }
+
+/* ─── Rows ─── */
+.row2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+/* ─── Empleados ─── */
+.empList { display: flex; flex-direction: column; }
+.empRow {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.empRow:last-child { border-bottom: none; }
+.empPos { font-family: var(--font-mono); font-size: 12px; color: var(--muted); width: 14px; }
+.empAv {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  display: grid; place-items: center;
+  color: #1a1407; font-weight: var(--fw-bold); font-size: 11px;
+  flex-shrink: 0;
+}
+.empNm { font-size: 13px; flex: 1; }
+.empAmt { font-family: var(--font-mono); font-size: 12.5px; color: var(--gold-text); }
+
+/* ─── Ranking servicios ─── */
+.rankList { display: flex; flex-direction: column; gap: 13px; }
+.rankItem { display: flex; align-items: center; gap: 12px; }
+.rankNm { font-size: 13px; width: 80px; flex-shrink: 0; }
+.rankTrack {
+  flex: 1; height: 7px; border-radius: 5px;
+  background: rgba(255,255,255,.06); overflow: hidden;
+}
+.rankFill {
+  height: 100%; border-radius: 5px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-deep));
+  transition: width .4s ease;
+}
+.rankAmt { font-family: var(--font-mono); font-size: 12px; color: var(--gold-text); width: 34px; text-align: right; }
+
+/* ─── Comisiones ─── */
+.commBox { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; height: 100%; }
+.commBig { font-weight: var(--fw-semibold); font-size: 30px; color: var(--gold-text); font-family: var(--font-mono); }
+.commLbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.commList {
+  display: flex; flex-direction: column; gap: 9px;
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.commRow { display: flex; align-items: center; gap: 10px; }
+.commNm { font-size: 13px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.commAmt { font-family: var(--font-mono); font-size: 12.5px; color: var(--gold-text); }
+
+/* ─── Resumen ─── */
+.resumen { display: flex; align-items: center; gap: 30px; }
+.resumenList { flex: 1; display: flex; flex-direction: column; gap: 11px; }
+.resumenRow { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.resumenIcon { display: grid; place-items: center; flex-shrink: 0; }
+.resumenIcon svg { width: 16px; height: 16px; stroke: var(--gold-soft); fill: none; stroke-width: 1.7; }
+.resumenVal { margin-left: auto; font-family: var(--font-mono); font-size: 12.5px; }
+.metaRing { flex-shrink: 0; text-align: center; }
+.metaPct { font-weight: var(--fw-semibold); font-size: 20px; margin-top: 6px; }
+.metaSub { font-size: 10.5px; color: var(--muted); display: block; }
+
+/* ─── Selector de sucursal (solo OWNER) — controla TODO el Dashboard ─── */
+.sucTabs { display: flex; gap: 8px; flex-wrap: wrap; margin: -2px 0 2px; }
+.sucTab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 20px;
+  border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--muted); font-size: 12.5px; font-weight: 600;
+  cursor: pointer; font-family: var(--font-body);
+}
+.sucTab:hover { color: var(--text); }
+.sucTabActivo {
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep));
+  border-color: var(--gold); color: #1a1407;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 1200px) {
+  .kpiGrid4 { grid-template-columns: repeat(2, 1fr); }
+  .row2, .row3 { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .kpiGrid4, .kpiGrid2 { grid-template-columns: 1fr; }
+}
+
+/* ─── Desktop vs Mobile toggle ─── */
+.desktopOnly { display: block; }
+.mobileOnly  { display: none; }
+
+@media (max-width: 768px) {
+  .desktopOnly { display: none; }
+  .mobileOnly  { display: block; }
+}

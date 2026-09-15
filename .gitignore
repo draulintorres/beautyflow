@@ -1,0 +1,48 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (secrets reales — nunca committear)
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Respaldos de base de datos — pueden contener datos reales
+backups/
+_backups/
+*.dump
+
+# Configuración local de Claude Code (personal, no compartida)
+/.claude/
+
+# Material previo a la construcción del frontend (maquetas HTML y tokens
+# de diseño de referencia, ya superados por el código real en
+# beautyflow-web/) y notas de handoff internas — no aportan a alguien
+# clonando el repo hoy, el frontend ya está construido.
+# OJO: anclados a la raíz con "/" — sin eso, "design-tokens/" también
+# excluye (por error) beautyflow-web/src/design-tokens/, que SÍ es real
+# y lo necesita la app para compilar (confirmado: rompía el build).
+/design-reference/
+/design-tokens/
+/FRONTEND_HANDOFF.md
+/HANDOFF_CLAUDE_CODE.md
+
+# Carpeta de assets sin procesar entregados para una ronda de diseño —
+# no es código del proyecto.
+/_nuevo-logo-estixa/

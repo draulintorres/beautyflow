@@ -1,0 +1,210 @@
+.sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--sidebar-1), var(--sidebar-2));
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px 16px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+/* ---- Brand ---- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+.logoMark {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+}
+.logoWord {
+  font-size: 17px;
+  font-weight: var(--fw-semibold);
+  background: linear-gradient(180deg, #f4e4b8, var(--gold) 55%, var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1;
+}
+/* Tema claro: el degradado dorado del logo pasa a negro/oscuro sólido,
+   igual que el resto del texto que era dorado (--gold-text). El tema
+   oscuro no toca esta regla — sigue con el degradado de siempre. */
+:root[data-theme="light"] .logoWord {
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  -webkit-text-fill-color: var(--gold-text);
+  color: var(--gold-text);
+}
+.logoRd {
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: var(--gold-text);
+  margin-top: 2px;
+  padding-left: 1px;
+}
+
+/* ---- Empresa chip ---- */
+.empresaChip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(201, 162, 75, 0.06);
+  border: 1px solid rgba(201, 162, 75, 0.18);
+  border-radius: var(--r-md);
+  padding: 9px 10px;
+  margin-bottom: 20px;
+}
+.empresaIco {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(201, 162, 75, 0.12);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.empresaIco svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--gold-soft);
+}
+.empresaNombre {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+.empresaPlan {
+  font-size: var(--fs-xs);
+  color: var(--gold);
+  margin-top: 1px;
+}
+
+/* ---- Nav ---- */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--muted);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.navItem:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+/* Tema claro: los enlaces del menú van en negro sólido para que se lean
+   bien sobre el sidebar blanco (en oscuro se quedan en --muted como siempre).
+   El estado activo ya se distingue por el fondo/borde dorado. */
+:root[data-theme="light"] .navItem {
+  color: var(--text);
+}
+.navItemActive {
+  background: rgba(201, 162, 75, 0.12);
+  color: var(--gold-text);
+  border: 1px solid rgba(201, 162, 75, 0.2);
+}
+.navItemActive .navIcon svg {
+  stroke: var(--gold-soft);
+}
+.navIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+.navIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---- Spacer ---- */
+.spacer {
+  flex: 1;
+}
+
+/* ---- User area ---- */
+.userArea {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 8px;
+  border-top: 1px solid var(--line);
+  margin-top: 10px;
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  color: #1a1407;
+  font-weight: var(--fw-bold);
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.userInfo {
+  flex: 1;
+  min-width: 0;
+}
+.userName {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.userRol {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-transform: capitalize;
+}
+.logoutBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  transition: color 0.15s, background 0.15s;
+}
+.logoutBtn:hover {
+  color: var(--err);
+  background: rgba(216, 80, 58, 0.1);
+}
+.logoutBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+}

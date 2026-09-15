@@ -1,0 +1,164 @@
+.wrap {
+  min-height: 100%; display: flex; flex-direction: column;
+  width: 100%; max-width: 100%; overflow-x: hidden; box-sizing: border-box;
+}
+
+.header { padding: 18px 18px 10px; box-sizing: border-box; }
+.header h1 { font-size: 23px; font-weight: 800; }
+.fechaLbl { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* ─── Selector de días ─── */
+.dias {
+  display: flex; gap: 8px; padding: 8px 18px 14px;
+  overflow-x: auto; width: 100%; box-sizing: border-box;
+}
+.dias::-webkit-scrollbar { display: none; }
+.dia {
+  flex-shrink: 0; width: 50px; padding: 10px 0; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--surface); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  position: relative; font-family: var(--font-body);
+}
+.diaNom { font-size: 11px; color: var(--muted); }
+.diaNum { font-size: 16px; font-weight: 700; color: var(--text); }
+.diaActivo { background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep)); border-color: var(--gold); }
+.diaActivo .diaNom,
+.diaActivo .diaNum { color: #1a1407; }
+.diaHoy { position: absolute; bottom: 5px; width: 4px; height: 4px; border-radius: 50%; background: var(--gold-soft); }
+.diaActivo .diaHoy { background: #1a1407; }
+
+/* ─── Lista ─── */
+.list {
+  flex: 1; padding: 4px 16px 150px; display: flex; flex-direction: column; gap: 10px;
+  width: 100%; box-sizing: border-box;
+}
+.card {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 13px 12px 13px 14px; cursor: pointer;
+  width: 100%; box-sizing: border-box; min-width: 0;
+}
+.card:active { background: var(--surface-2); }
+.cardHora { font-size: 11px; font-weight: 700; color: var(--gold-text); width: 56px; flex-shrink: 0; font-family: var(--font-mono); }
+.cardAvatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  display: grid; place-items: center;
+  color: #1a1407; font-weight: 700; font-size: 12px; flex-shrink: 0;
+}
+.cardInfo { flex: 1; min-width: 0; overflow: hidden; }
+.cardCliente { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardServ { font-size: 11.5px; color: var(--muted); margin: 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardEmp { font-size: 11px; color: #6b6a64; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ─── Badges ─── */
+.badge { font-size: 9.5px; font-weight: 600; padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; align-self: center; }
+.ok   { background: rgba(29,158,117,.16);  color: var(--ok); }
+.pend { background: rgba(217,165,49,.16);  color: var(--warn); }
+.info { background: rgba(56,120,199,.16);  color: var(--info); }
+.done { background: rgba(201,162,75,.16);  color: var(--gold-text); }
+.canc { background: rgba(216,80,58,.14);   color: var(--err); }
+
+/* ─── Estados ─── */
+.empty { text-align: center; color: var(--muted); font-size: 13.5px; padding: 50px 20px; }
+.loadWrap { display: flex; justify-content: center; padding: 50px; }
+.spinner { width: 24px; height: 24px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── FAB ─── */
+.fab {
+  position: fixed; left: 16px; right: 16px;
+  bottom: calc(65px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
+  color: #1a1407; border: none; border-radius: 14px; padding: 15px;
+  font-size: 15px; font-weight: 700; cursor: pointer; font-family: var(--font-body);
+  box-shadow: 0 8px 24px rgba(201,162,75,.3); z-index: 50;
+}
+
+/* ─── Bottom sheet ─── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 300; display: flex; align-items: flex-end; }
+.sheet {
+  background: var(--surface); border-top: 1px solid var(--line);
+  border-radius: 22px 22px 0 0; width: 100%;
+  padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 14px;
+  max-height: 88vh; overflow-y: auto;
+}
+.handle { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto; }
+
+/* Cabecera detalle */
+.detHead { display: flex; align-items: center; gap: 13px; }
+.detAvatar {
+  width: 50px; height: 50px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  display: grid; place-items: center;
+  color: #1a1407; font-weight: 700; font-size: 16px;
+}
+.detCliente { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+
+/* Filas de detalle */
+.detRows { display: flex; flex-direction: column; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.detRow { display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; }
+.detRow span { color: var(--muted); }
+.detRow b { font-weight: 600; text-align: right; max-width: 55%; }
+.detNota { font-size: 12.5px; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 10px; line-height: 1.4; }
+
+/* Candado "una venta por cita" (Parte B) */
+.yaCobrada {
+  display: flex; align-items: center; gap: 8px; margin-top: 4px;
+  background: rgba(29,158,117,.1); border: 1px solid rgba(29,158,117,.3);
+  border-radius: 10px; padding: 10px 12px; font-size: 12.5px; font-weight: 600; color: var(--ok);
+}
+.yaCobrada span { flex: 1; }
+.yaCobrada button {
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--gold-text);
+  border-radius: 7px; padding: 6px 10px; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; font-family: var(--font-body); flex-shrink: 0;
+}
+
+/* Botones de acción */
+.detActions { display: flex; flex-direction: column; gap: 9px; }
+.detActions > * {
+  padding: 13px; border-radius: 12px; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: var(--font-body); border: none;
+  text-align: center; text-decoration: none; display: block;
+}
+.detActions > *:disabled { opacity: .5; cursor: not-allowed; }
+.actOk    { background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep)); color: #1a1407; }
+.actInfo  { background: rgba(56,120,199,.15);  color: var(--info);  border: 1px solid rgba(56,120,199,.4) !important; }
+.actWa    { background: rgba(29,158,117,.14);  color: var(--ok);    border: 1px solid rgba(29,158,117,.4) !important; }
+.actReprog { background: var(--surface-2); color: var(--text); border: 1px solid var(--line) !important; }
+.actCancel { background: rgba(216,80,58,.1);   color: var(--err);   border: 1px solid rgba(216,80,58,.3) !important; }
+.actGhost  { background: none; color: var(--muted); }
+
+/* Reprogramar */
+.reprogTitle { font-size: 17px; font-weight: 700; }
+.reprogForm { display: flex; flex-direction: column; gap: 12px; }
+.reprogForm label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.reprogForm input {
+  background: var(--field, var(--surface-2)); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px; color: var(--text);
+  font-size: 15px; font-family: var(--font-body);
+}
+.reprogForm input:focus { outline: none; border-color: var(--gold); }
+
+/* ─── Resumen del día ─── */
+.resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 4px 16px 12px; }
+.resCard { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 12px 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+.resIco { width: 34px; height: 34px; border-radius: 10px; background: rgba(201,162,75,.12); display: grid; place-items: center; }
+.resIco svg { width: 17px; height: 17px; stroke: var(--gold-soft); fill: none; stroke-width: 1.8; }
+.resLbl { font-size: 9.5px; color: var(--muted); }
+.resVal { font-size: 14px; font-weight: 800; color: var(--gold-text); }
+.resValOk { color: var(--ok); }
+
+/* ─── Filtros ─── */
+.filtros { display: flex; gap: 5px; padding: 4px 8px 12px; overflow-x: auto; justify-content: center; }
+.filtros::-webkit-scrollbar { display: none; }
+.filtro { flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 7px 9px; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; font-family: var(--font-body); white-space: nowrap; }
+.filtroActivo { border-color: var(--gold); color: var(--gold-text); background: rgba(201,162,75,.1); }
+.filtroNum { font-size: 10px; background: rgba(255,255,255,.08); border-radius: 10px; padding: 1px 5px; }
+.filtroActivo .filtroNum { background: rgba(201,162,75,.2); }
+
+/* ─── Card right (badge + chevron) ─── */
+.cardRight { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.chev { width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 2; }

@@ -1,0 +1,340 @@
+/* ─── Página ─────────────────────────────────────────────── */
+.page {
+  padding: 32px 36px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ─── Topbar ─────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; margin: 0 0 4px; }
+.sub   { font-size: 13px; color: var(--muted); margin: 0; }
+
+.btnNew {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 18px;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
+  color: #1a1407; border: none; border-radius: 10px;
+  font-size: 13.5px; font-weight: 700; font-family: var(--font-body);
+  cursor: pointer; white-space: nowrap;
+  transition: opacity .18s, transform .1s;
+}
+.btnNew:hover { opacity: .9; transform: translateY(-1px); }
+.btnNew svg { width: 16px; height: 16px; stroke: #1a1407; stroke-width: 2.2; fill: none; }
+
+/* ─── Filtros ────────────────────────────────────────────── */
+.filters {
+  display: flex; gap: 8px;
+}
+.filters button {
+  padding: 7px 16px;
+  background: var(--surface);
+  border:  1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px; font-family: var(--font-body);
+  cursor: pointer;
+  transition: all .15s;
+}
+.filters button:hover { background: var(--surface-2); color: var(--text); }
+.filters .fActive {
+  background: rgba(201,162,75,.12);
+  border-color: rgba(201,162,75,.35);
+  color: var(--gold-text);
+  font-weight: 600;
+}
+
+/* ─── Tabla card ─────────────────────────────────────────── */
+.tableCard {
+  background: var(--surface);
+  border:  1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  flex: 1;
+}
+.tableWrap { overflow-x: auto; }
+.table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13.5px;
+}
+.table thead tr {
+  border-bottom:  1px solid var(--line);
+}
+.table th {
+  padding: 12px 16px;
+  text-align: center;
+  font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.table th:first-child { text-align: left; }
+.table tbody tr {
+  border-bottom:  1px solid var(--line);
+  transition: background .12s;
+}
+.table tbody tr:last-child { border-bottom: none; }
+.table tbody tr:hover { background: var(--surface-2); }
+.table td { padding: 14px 16px; vertical-align: middle; text-align: center; }
+.table td:first-child { text-align: left; }
+
+/* Empresa cell */
+.empCell { display: flex; align-items: center; gap: 12px; }
+.empAv {
+  width: 36px; height: 36px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; color: #1a1407;
+  flex-shrink: 0;
+}
+.empCell b    { display: block; font-size: 14px; }
+.empCell small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+
+/* Badges */
+.planBadge {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600;
+  background: rgba(201,162,75,.1); border: 1px solid rgba(201,162,75,.22);
+  color: var(--gold-text);
+}
+.stBadge {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600;
+}
+.stActive { background: rgba(29,158,117,.12); border: 1px solid rgba(29,158,117,.3); color: var(--sa-ok); }
+.stSusp   { background: rgba(216,123,58,.12); border: 1px solid rgba(216,123,58,.3); color: var(--sa-warn); }
+.stCanc   { background: rgba(216,80,58,.1);   border: 1px solid rgba(216,80,58,.25); color: var(--sa-err); }
+
+.num  { color: var(--text); }
+.fecha { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+
+/* Acciones */
+.actions { display: flex; align-items: center; gap: 6px; justify-content: center; }
+.actBtn {
+  width: 32px; height: 32px; border-radius: 8px;
+  border:  1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer; display: grid; place-items: center;
+  transition: all .15s;
+}
+.actBtn svg { width: 15px; height: 15px; stroke: var(--muted); fill: none; stroke-width: 1.8; }
+.actBtn:hover { background: var(--surface-2); border-color: var(--line); }
+.actDanger { border-color: rgba(216,80,58,.3); }
+.actDanger svg { stroke: var(--sa-err); }
+.actDanger:hover { background: rgba(216,80,58,.12); border-color: rgba(216,80,58,.5); }
+.actOk { border-color: rgba(29,158,117,.3); }
+.actOk svg { stroke: var(--sa-ok); }
+.actOk:hover { background: rgba(29,158,117,.12); }
+
+/* Empty / loader */
+.loadWrap { display: flex; justify-content: center; align-items: center; padding: 48px; }
+.spinner {
+  width: 28px; height: 28px;
+  border: 2.5px solid rgba(201,162,75,.2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin .65s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.emptyMsg { text-align: center; color: var(--muted); padding: 48px 16px; margin: 0; }
+
+/* ─── Overlay / Modal ────────────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid rgba(201,162,75,.18);
+  border-radius: 16px;
+  width: 100%; max-width: 560px;
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,.7);
+}
+.modalHead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom:  1px solid var(--line);
+}
+.modalHead h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.modalHead > button {
+  background: none; border: none; cursor: pointer;
+  width: 30px; height: 30px; border-radius: 7px;
+  display: grid; place-items: center;
+  transition: background .15s;
+}
+.modalHead > button svg { width: 16px; height: 16px; stroke: var(--muted); fill: none; stroke-width: 1.8; }
+.modalHead > button:hover { background: var(--surface-2); }
+
+.modalBody {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.modalFoot {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px;
+  border-top:  1px solid var(--line);
+}
+
+/* ─── Formulario del modal ───────────────────────────────── */
+.sectionLbl {
+  font-size: 11px; font-weight: 600; letter-spacing: .7px; text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: -8px;
+}
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.fieldWrap { display: flex; flex-direction: column; gap: 6px; }
+.fieldLbl  { font-size: 12px; font-weight: 500; color: var(--muted); }
+
+.fieldWrap input,
+.fieldWrap select,
+.fieldWrap textarea {
+  width: 100%; box-sizing: border-box;
+  background: var(--field);
+  border:  1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text); font-size: 13.5px; font-family: var(--font-body);
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color .15s;
+  resize: vertical;
+}
+.fieldWrap input:focus,
+.fieldWrap select:focus,
+.fieldWrap textarea:focus { border-color: var(--gold); }
+.fieldWrap input::placeholder,
+.fieldWrap textarea::placeholder { color: var(--muted-faint); }
+.fieldWrap select option { background: var(--select-opt-bg); color: var(--text); }
+
+/* Chips de verticales */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  padding: 6px 13px; border-radius: 7px; font-size: 12.5px;
+  background: var(--surface);
+  border:  1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer; font-family: var(--font-body);
+  transition: all .15s;
+}
+.chip:hover { background: var(--surface-2); color: var(--text); }
+.chipOn {
+  background: rgba(201,162,75,.12);
+  border-color: rgba(201,162,75,.4);
+  color: var(--gold-text);
+  font-weight: 600;
+}
+
+.hint {
+  font-size: 12px; color: var(--muted); margin: 0;
+  line-height: 1.5;
+}
+.slugHint {
+  font-size: 11px; color: var(--muted); margin: 5px 0 0;
+  line-height: 1.5;
+}
+
+.modalErr {
+  font-size: 12.5px; color: var(--sa-err);
+  background: rgba(216,80,58,.08);
+  border: 1px solid rgba(216,80,58,.2);
+  border-radius: 8px; padding: 10px 12px;
+  margin: 0;
+}
+
+/* Botones del modal */
+.btnCancel {
+  padding: 9px 18px; border-radius: 9px;
+  background: var(--surface);
+  border:  1px solid var(--line);
+  color: var(--muted); font-size: 13.5px; font-family: var(--font-body);
+  cursor: pointer;
+  transition: all .15s;
+}
+.btnCancel:hover { background: var(--surface-2); color: var(--text); }
+.btnSave {
+  padding: 9px 20px; border-radius: 9px;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
+  color: #1a1407; border: none;
+  font-size: 13.5px; font-weight: 700; font-family: var(--font-body);
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.btnSave:disabled { opacity: .45; cursor: not-allowed; }
+.btnSave:hover:not(:disabled) { opacity: .9; }
+.btnDanger {
+  padding: 9px 20px; border-radius: 9px;
+  background: rgba(216,80,58,.15);
+  border: 1px solid rgba(216,80,58,.4);
+  color: var(--sa-err);
+  font-size: 13.5px; font-weight: 700; font-family: var(--font-body);
+  cursor: pointer;
+  transition: all .15s;
+}
+.btnDanger:hover:not(:disabled) { background: rgba(216,80,58,.25); }
+.btnDanger:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ─── Vista éxito / credenciales ─────────────────────────── */
+.successText { font-size: 14px; color: var(--text); margin: 0; }
+.credBox {
+  background: var(--surface-2);
+  border: 1px solid rgba(201,162,75,.18);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.credRow {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.credRow span { font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.credRow b    { font-size: 14.5px; color: var(--text); }
+.passReveal { display: flex; align-items: center; gap: 10px; }
+.passReveal code {
+  flex: 1; font-family: var(--font-mono); font-size: 15px;
+  color: var(--gold-text); letter-spacing: .5px;
+  background: rgba(201,162,75,.07);
+  border: 1px solid rgba(201,162,75,.15);
+  border-radius: 8px; padding: 8px 12px;
+}
+.passReveal button {
+  padding: 7px 14px; border-radius: 8px;
+  background: rgba(201,162,75,.1);
+  border: 1px solid rgba(201,162,75,.3);
+  color: var(--gold-text); font-size: 12.5px; font-weight: 600; font-family: var(--font-body);
+  cursor: pointer; white-space: nowrap;
+  transition: all .15s;
+}
+.passReveal button:hover { background: rgba(201,162,75,.18); }
+.credWarn {
+  font-size: 12px; color: var(--sa-warn);
+  background: rgba(216,123,58,.08);
+  border: 1px solid rgba(216,123,58,.2);
+  border-radius: 8px; padding: 10px 12px;
+  margin: 0; line-height: 1.45;
+}
+
+/* ─── Modal Suspender ────────────────────────────────────── */
+.suspWarn {
+  font-size: 14px; color: var(--muted);
+  background: rgba(216,80,58,.07);
+  border: 1px solid rgba(216,80,58,.18);
+  border-radius: 10px; padding: 14px 16px;
+  margin: 0; line-height: 1.5;
+}
+.suspWarn b { color: var(--text); }

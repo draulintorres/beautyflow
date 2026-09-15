@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <!-- Tema claro/oscuro: se lee y aplica ANTES de la primera pintura para
+         evitar el "flash" de oscuro (default) en usuarios que eligieron
+         claro. El store (src/store/theme.ts) hace lo mismo después, para
+         mantener React en sync — esto es solo para que no haya parpadeo. -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('bf-theme') === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <!-- Sin esto, el "Auto Dark Theme" de Chrome/Android (activo por
+         default en muchos celulares) no confía en que la página maneja
+         su propio modo oscuro/claro, y reescribe por su cuenta el fondo
+         de los <input> a blanco con texto oscuro — aunque el CSS del
+         proyecto ya pida el fondo oscuro correcto (confirmado: el bug
+         solo pasaba en Android, nunca en iOS/Safari, y afectaba incluso
+         un campo vacío sin autocompletar — no era autofill). Esta etiqueta
+         le dice al navegador que la página YA soporta ambos esquemas
+         correctamente (ver [data-theme] en tokens.css), así que confía en
+         los colores reales del CSS en vez de "corregirlos" por su cuenta. -->
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/favicon-16.png" sizes="16x16" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0b" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Estixa" />
+    <title>Estixa</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

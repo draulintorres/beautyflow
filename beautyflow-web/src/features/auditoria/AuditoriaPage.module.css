@@ -1,0 +1,165 @@
+.page { display: flex; flex-direction: column; gap: 18px; }
+
+/* El shell (.content de AppLayout) no da padding en mobile — mismo criterio
+   y mismo valor que ya usan Reportes, Liquidaciones, Usuarios, Ajustes y
+   Sucursales (su .page/.wrap con padding: 16px a este breakpoint), no un
+   valor nuevo. Sin esto el contenido queda pegado a los bordes. */
+@media (max-width: 768px) {
+  .page { padding: 16px; }
+}
+
+.header h1 { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); }
+.sub { color: var(--muted); font-size: var(--fs-sm); margin-top: 4px; max-width: 640px; }
+
+/* ─── Filtros ─── */
+.filtrosToggle { display: none; } /* solo aparece en celular — ver media query */
+
+.filtros {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 16px 18px;
+}
+.filtroGrupo { display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
+.filtroGrupo label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted);
+}
+.input, .select {
+  background: var(--field); border: 1px solid var(--line); border-radius: 9px;
+  padding: 8px 10px; font-size: 13px; color: var(--text); font-family: var(--font-body);
+  transition: border-color 0.15s;
+}
+.input:focus, .select:focus { border-color: var(--gold); outline: none; }
+.limpiarBtn {
+  background: none; border: 1px solid var(--line); border-radius: 9px;
+  padding: 8px 14px; font-size: 12.5px; color: var(--muted); cursor: pointer;
+  height: 35px; align-self: flex-end;
+}
+.limpiarBtn:hover { color: var(--text); border-color: var(--gold); }
+
+/* ─── Panel / lista ─── */
+.panel {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 15px; overflow: hidden;
+}
+.estadoMsg { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 13.5px; }
+
+.lista { display: flex; flex-direction: column; }
+.fila { border-bottom: 1px solid var(--line); }
+.fila:last-child { border-bottom: none; }
+
+.filaHead {
+  width: 100%; display: grid;
+  grid-template-columns: 100px 140px 120px 100px 1fr 20px;
+  align-items: center; gap: 14px;
+  padding: 13px 18px; background: none; border: none; cursor: pointer;
+  text-align: left; font-family: var(--font-body); color: var(--text);
+  transition: background 0.15s;
+}
+.filaHead:hover { background: var(--surface-2); }
+
+.filaFecha { display: flex; flex-direction: column; font-size: 12px; }
+.filaFecha small { color: var(--muted); font-size: 11px; }
+/* En desktop este wrapper "desaparece" — usuario y módulo siguen siendo
+   celdas de grid independientes, como antes. En mobile (media query de
+   abajo) se convierte en una fila propia. */
+.filaMeta { display: contents; }
+.filaUsuario { font-size: 13px; font-weight: var(--fw-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filaModulo { font-size: 12px; color: var(--muted); }
+.filaTitulo { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.chip {
+  justify-self: start; font-size: 10.5px; font-weight: var(--fw-semibold);
+  padding: 3px 9px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.chip_ok    { background: rgba(21, 122, 87, 0.14); color: var(--ok); }
+.chip_err   { background: rgba(192, 57, 43, 0.14); color: var(--err); }
+.chip_warn  { background: rgba(156, 110, 14, 0.14); color: var(--warn); }
+.chip_info  { background: rgba(42, 93, 156, 0.14); color: var(--info); }
+.chip_default { background: var(--surface-2); color: var(--muted); }
+
+.chevron { width: 16px; height: 16px; color: var(--muted); transition: transform 0.15s; flex-shrink: 0; }
+.chevronOpen { transform: rotate(180deg); }
+
+.detalle {
+  padding: 4px 18px 16px 232px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.detalleVacio { font-size: 12.5px; color: var(--muted); }
+.detalleRow { display: flex; gap: 10px; font-size: 12.5px; }
+.detalleLabel { color: var(--muted); min-width: 150px; flex-shrink: 0; }
+.detalleValue { color: var(--text); font-family: var(--font-mono); word-break: break-word; }
+
+/* ─── Paginación ─── */
+.paginacion {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-top: 1px solid var(--line);
+}
+.paginacionInfo { font-size: 12px; color: var(--muted); }
+.paginacionBtns { display: flex; gap: 8px; }
+.pagBtn {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 13px; font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.pagBtn:disabled { opacity: 0.4; cursor: default; }
+.pagBtn:not(:disabled):hover { border-color: var(--gold); }
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  /* Filtros: 5 campos siempre visibles empujaban toda la lista bajo el
+     pliegue — en celular arrancan colapsados detrás de este botón, con un
+     contador de cuántos están activos. */
+  .filtrosToggle {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 16px; font-size: 13.5px;
+    font-weight: var(--fw-medium); color: var(--text); cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .filtrosBadge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 7px;
+    background: var(--gold); color: #1a1407; font-size: 10.5px;
+    font-weight: var(--fw-semibold); border-radius: 20px;
+  }
+  .filtrosToggle .chevron { color: var(--muted); }
+
+  .filtros {
+    display: none;
+    grid-template-columns: 1fr 1fr; gap: 12px;
+    padding: 14px 16px;
+  }
+  .filtrosAbiertos { display: grid; }
+  .filtroGrupo { min-width: 0; }
+  .limpiarBtn { grid-column: 1 / -1; align-self: stretch; height: auto; padding: 9px; }
+
+  .filaHead {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "fecha chip"
+      "titulo titulo"
+      "meta meta";
+    row-gap: 6px;
+    padding: 14px 16px;
+  }
+  .filaFecha { grid-area: fecha; }
+  .chip { grid-area: chip; }
+  .filaTitulo { grid-area: titulo; white-space: normal; }
+  /* El módulo se veía como texto gris chiquito pegado a la derecha, fácil
+     de pasar por alto — ahora es su propia línea, junto al usuario,
+     separada por un punto, con más contraste. */
+  .filaMeta {
+    grid-area: meta; display: flex; align-items: center; gap: 6px;
+    font-size: 12.5px; flex-wrap: wrap;
+  }
+  .filaUsuario { color: var(--text); white-space: normal; overflow: visible; text-overflow: clip; }
+  .filaModulo {
+    color: var(--gold-text); font-weight: var(--fw-medium);
+    position: relative; padding-left: 12px;
+  }
+  .filaModulo::before {
+    content: '·'; position: absolute; left: 4px; color: var(--muted);
+  }
+  .chevron { display: none; }
+  .detalle { padding-left: 16px; }
+}

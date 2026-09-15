@@ -1,0 +1,32 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.svg { flex-shrink: 0; }
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+}
+.dot {
+  width: 9px; height: 9px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.lbl { flex: 1; }
+.pct {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.empty {
+  font-size: 12px;
+  color: var(--muted);
+}

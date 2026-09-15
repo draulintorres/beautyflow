@@ -1,0 +1,230 @@
+/* ─── Layout ─────────────────────────────────────────────── */
+.page {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+  font-family: var(--font-body);
+}
+
+/* ─── Panel Izquierdo ─────────────────────────────────────── */
+.left {
+  width: 42%;
+  flex-shrink: 0;
+  /* overlay muy opaco: imagen apenas se percibe como atmósfera */
+  background-image:
+    linear-gradient(155deg, rgba(10,10,11,.94) 0%, rgba(10,10,11,.97) 100%),
+    url('https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1400&q=80');
+  background-size: cover;
+  background-position: center;
+  border-right: 1px solid rgba(201,162,75,.15);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Centra el contenido verticalmente */
+.leftInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  flex: 1;
+  z-index: 1;
+  position: relative;
+}
+
+/* ── Card interior: base oscura garantiza legibilidad siempre ── */
+.leftCard {
+  background: rgba(10,10,11,.50);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(201,162,75,.12);
+  border-radius: 18px;
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 380px;
+}
+
+/* Acento dorado inferior izquierdo */
+.glow {
+  position: absolute;
+  left: -80px;
+  bottom: -100px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,162,75,.14), transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+/* Acento dorado superior derecho */
+.left::before {
+  content: '';
+  position: absolute;
+  right: -50px;
+  top: -50px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,162,75,.08), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Logo ─────────────────────────────────────────────────── */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+/* SVG logo heredado del login de salones */
+.logoMark {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 3px 10px rgba(201,162,75,.25));
+}
+.brandText { display: flex; align-items: baseline; gap: 5px; }
+.brandName { font-size: 19px; font-weight: 700; color: var(--gold-text); letter-spacing: .2px; }
+.brandRd {
+  font-size: 12px; font-weight: 700; letter-spacing: 3px;
+  color: var(--gold); background: rgba(201,162,75,.12);
+  border: 1px solid rgba(201,162,75,.25); border-radius: 5px;
+  padding: 1px 7px;
+}
+
+/* ── Badge ────────────────────────────────────────────────── */
+.adminBadge {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+  color: var(--gold);
+  background: rgba(201,162,75,.1);
+  border: 1px solid rgba(201,162,75,.28);
+  border-radius: 7px;
+  padding: 4px 11px;
+  margin-bottom: 8px;
+  width: fit-content;
+}
+
+/* ── Subtítulo ────────────────────────────────────────────── */
+.subtitle {
+  font-size: 12.5px;
+  color: rgba(255,255,255,.45);
+  line-height: 1.55;
+  margin-bottom: 20px;
+}
+
+/* ── Divider ──────────────────────────────────────────────── */
+.divider {
+  width: 40px; height: 2px;
+  background: linear-gradient(90deg, var(--gold), transparent);
+  border-radius: 2px;
+  margin-bottom: 20px;
+}
+
+/* ── Features ─────────────────────────────────────────────── */
+.features {
+  list-style: none;
+  display: flex; flex-direction: column;
+  gap: 16px;
+  padding: 0; margin: 0;
+}
+.feat { display: flex; align-items: flex-start; gap: 13px; }
+.featIcon {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: rgba(201,162,75,.1); border: 1px solid rgba(201,162,75,.16);
+  display: grid; place-items: center; flex-shrink: 0; color: var(--gold-text);
+}
+.featIcon svg { width: 16px; height: 16px; }
+.feat b { font-size: 13px; font-weight: 600; display: block; margin-bottom: 2px; }
+.feat small { font-size: 11.5px; color: rgba(255,255,255,.45); line-height: 1.4; display: block; }
+
+/* ─── Panel Derecho ───────────────────────────────────────── */
+.right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 52px 20px 32px;
+}
+.formWrap { width: 100%; max-width: 440px; }
+
+.welcome { margin-bottom: 34px; }
+.welcome h1 { font-size: 28px; font-weight: 700; letter-spacing: -.4px; margin-bottom: 6px; }
+.welcome p { font-size: 14px; color: var(--muted); }
+
+/* ── Form ─────────────────────────────────────────────────── */
+.form { display: flex; flex-direction: column; gap: 18px; }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field label { font-size: 12.5px; font-weight: 500; color: var(--muted); letter-spacing: .2px; }
+
+.inputWrap {
+  position: relative;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  display: flex; align-items: center;
+  transition: border-color .18s;
+}
+.inputWrap:focus-within { border-color: var(--gold); }
+.inputIcon {
+  width: 16px; height: 16px;
+  position: absolute; left: 13px;
+  stroke: var(--muted); flex-shrink: 0; pointer-events: none;
+}
+.inputWrap input {
+  background: none; border: none; outline: none;
+  color: var(--text); font-size: 14px; font-family: var(--font-body);
+  padding: 12px 42px 12px 38px;
+  width: 100%;
+}
+.inputWrap input::placeholder { color: var(--muted-faint); }
+.eyeBtn {
+  position: absolute; right: 10px;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); display: grid; place-items: center;
+  padding: 4px;
+}
+.eyeBtn:hover { color: var(--text); }
+.eyeBtn svg { width: 16px; height: 16px; }
+
+.errorMsg {
+  background: rgba(216,80,58,.1); border: 1px solid rgba(216,80,58,.3);
+  color: var(--err); font-size: 13px; padding: 10px 14px; border-radius: 9px;
+}
+
+.btnLogin {
+  width: 100%; padding: 13px;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
+  color: #1a1407; border: none; border-radius: 11px;
+  font-size: 14.5px; font-weight: 700; font-family: var(--font-body);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px;
+  transition: opacity .18s, transform .1s;
+  margin-top: 4px;
+}
+.btnLogin:hover:not(:disabled) { opacity: .92; transform: translateY(-1px); }
+.btnLogin:active:not(:disabled) { transform: translateY(0); }
+.btnLogin:disabled { opacity: .5; cursor: not-allowed; }
+.btnLogin svg { width: 17px; height: 17px; stroke: #1a1407; }
+
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(26,20,7,.3);
+  border-top-color: #1a1407;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Footer ───────────────────────────────────────────────── */
+.foot { font-size: 11.5px; color: var(--muted-faint); text-align: center; }
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .left { display: none; }
+  .right { padding: 40px 20px 28px; }
+}
