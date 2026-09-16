@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useSAAuthStore } from '../../store/saAuth';
 import styles from './SALayout.module.css';
@@ -47,6 +48,7 @@ const NAV = [
 export function SALayout() {
   const { admin, logout } = useSAAuthStore();
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   function handleLogout() {
     logout();
@@ -60,8 +62,30 @@ export function SALayout() {
   return (
     <div className={styles.app}>
 
-      {/* ── Sidebar ── */}
-      <aside className={styles.sidebar}>
+      {/* ── Topbar mobile: solo visible <=720px, el sidebar de abajo se
+          oculta ahí y esta es la única forma de navegar entre módulos. ── */}
+      <header className={styles.mobileTopbar}>
+        <button
+          className={styles.hamburger}
+          onClick={() => setMobileOpen(true)}
+          aria-label="Abrir menú"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
+        <div className={styles.brand}>
+          <div className={styles.mark}>E</div>
+          <div className={styles.brandText}><b>Estixa</b></div>
+        </div>
+      </header>
+
+      {mobileOpen && (
+        <div className={styles.backdrop} onClick={() => setMobileOpen(false)} />
+      )}
+
+      {/* ── Sidebar (drawer en mobile) ── */}
+      <aside className={`${styles.sidebar} ${mobileOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.brand}>
           <div className={styles.mark}>E</div>
           <div className={styles.brandText}>
@@ -76,6 +100,7 @@ export function SALayout() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
               }
