@@ -58,12 +58,41 @@ export class AuthService {
     this.frontendUrl = this.config.getOrThrow('FRONTEND_URL');
   }
 
+  /**
+   * Resuelve la empresa a partir de lo que la persona escribió en el campo
+   * "Empresa" del login, tolerando que no haya escrito los guiones exactos
+   * (ej. "chenarbarbershop" o "Chenar Barber Shop" → "chenar-barber-shop").
+   * 1) Intento exacto contra el slug normalizado (minúsculas, espacios→guión).
+   * 2) Si no hay match, comparo ese mismo valor SIN guiones contra los
+   *    slugs de empresas activas también sin guiones — la tabla es chica,
+   *    trae los candidatos y compara en código es más simple que SQL crudo.
+   *    Si hay más de una coincidencia (colisión), no adivino: se trata
+   *    igual que "no encontrada", y la persona debe escribir el slug
+   *    completo con guiones.
+   */
+  private async resolverEmpresaPorSlug(slugInput: string) {
+    const normalizado = slugInput.trim().toLowerCase().replace(/\s+/g, '-');
+
+    const exacta = await this.prisma.empresa.findUnique({
+      where: { slug: normalizado },
+    });
+    if (exacta) return exacta;
+
+    const sinGuiones = normalizado.replace(/-/g, '');
+    if (!sinGuiones) return null;
+
+    const activas = await this.prisma.empresa.findMany({
+      where: { estado: EmpresaStatus.ACTIVE, deletedAt: null },
+    });
+    const coincidencias = activas.filter(
+      (e) => e.slug.toLowerCase().replace(/-/g, '') === sinGuiones,
+    );
+    return coincidencias.length === 1 ? coincidencias[0] : null;
+  }
+
   // ---------- LOGIN ----------
   async login(empresaSlug: string, email: string, password: string) {
-    // Resolver empresa por slug (consulta directa: Empresa no lleva filtro de tenant)
-    const empresa = await this.prisma.empresa.findUnique({
-      where: { slug: empresaSlug },
-    });
+    const empresa = await this.resolverEmpresaPorSlug(empresaSlug);
     if (!empresa || empresa.deletedAt || empresa.estado !== EmpresaStatus.ACTIVE) {
       throw new UnauthorizedException('Empresa no disponible');
     }

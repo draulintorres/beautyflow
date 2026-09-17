@@ -36,6 +36,12 @@ export function LoginPage() {
   // prellenar el formulario la próxima vez. Arranca marcado si ya había
   // algo recordado de una vez anterior.
   const [recordarCorreo, setRecordarCorreo] = useState(!!recordado);
+  // Con empresa+correo ya recordados de una vez anterior, el formulario
+  // arranca colapsado (solo contraseña) — "Cambiar" fuerza los 3 campos
+  // de vuelta, para el caso de alguien con cuenta en más de una empresa
+  // en el mismo dispositivo (ej. el propio Draulin).
+  const [modoCambiar, setModoCambiar] = useState(false);
+  const modoColapsado = !!recordado && !modoCambiar;
   const [loading, setLoading] = useState(false);
   const [loadingHuella, setLoadingHuella] = useState(false);
   const [error, setError] = useState('');
@@ -234,44 +240,68 @@ export function LoginPage() {
 
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
 
-            {/* Empresa slug */}
-            <div className={styles.field}>
-              <label htmlFor="empresaSlug">Empresa</label>
-              <div className={styles.inputWrap}>
-                <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M4 10l8-5 8 5M6 10v9h12v-9" />
-                </svg>
-                <input
-                  id="empresaSlug"
-                  name="empresaSlug"
-                  type="text"
-                  placeholder="ej: beauty-glam"
-                  value={form.empresaSlug}
-                  onChange={handleChange}
-                  autoComplete="organization"
-                />
-              </div>
-              <p className={styles.fieldHint}>El nombre corto de tu negocio. Ej: beauty-glam</p>
-            </div>
-
-            {/* Email */}
-            <div className={styles.field}>
-              <label htmlFor="email">Correo electrónico</label>
-              <div className={styles.inputWrap}>
-                <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            {modoColapsado ? (
+              /* Empresa + correo ya recordados: se muestran como texto,
+                 no como campos — "Cambiar" trae de vuelta el formulario
+                 completo y editable. */
+              <div className={styles.recordadoBar}>
+                <svg className={styles.recordadoIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" />
                 </svg>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Ingresa tu correo electrónico"
-                  value={form.email}
-                  onChange={handleChange}
-                  autoComplete="email"
-                />
+                <div className={styles.recordadoInfo}>
+                  <b>{recordado!.empresaSlug}</b>
+                  <span>{recordado!.email}</span>
+                </div>
+                <button
+                  type="button"
+                  className={styles.cambiarBtn}
+                  onClick={() => setModoCambiar(true)}
+                >
+                  Cambiar
+                </button>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Empresa slug */}
+                <div className={styles.field}>
+                  <label htmlFor="empresaSlug">Empresa</label>
+                  <div className={styles.inputWrap}>
+                    <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M4 10l8-5 8 5M6 10v9h12v-9" />
+                    </svg>
+                    <input
+                      id="empresaSlug"
+                      name="empresaSlug"
+                      type="text"
+                      placeholder="ej: beauty-glam"
+                      value={form.empresaSlug}
+                      onChange={handleChange}
+                      autoComplete="organization"
+                    />
+                  </div>
+                  <p className={styles.fieldHint}>El nombre corto de tu negocio. Ej: beauty-glam</p>
+                </div>
+
+                {/* Email */}
+                <div className={styles.field}>
+                  <label htmlFor="email">Correo electrónico</label>
+                  <div className={styles.inputWrap}>
+                    <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" />
+                    </svg>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="Ingresa tu correo electrónico"
+                      value={form.email}
+                      onChange={handleChange}
+                      autoComplete="email"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Contraseña */}
             <div className={styles.field}>
@@ -317,20 +347,26 @@ export function LoginPage() {
             {error && <div className={styles.errorMsg}>{error}</div>}
 
             <div className={styles.row}>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={recordarCorreo}
-                  onChange={(e) => setRecordarCorreo(e.target.checked)}
-                />
-                Recordar mi correo
-              </label>
+              {modoColapsado ? (
+                <span />
+              ) : (
+                <label className={styles.check}>
+                  <input
+                    type="checkbox"
+                    checked={recordarCorreo}
+                    onChange={(e) => setRecordarCorreo(e.target.checked)}
+                  />
+                  Recordar mi correo
+                </label>
+              )}
               <Link to="/forgot-password" className={styles.forgot}>¿Olvidaste tu contraseña?</Link>
             </div>
-            <p className={styles.fieldHint} style={{ marginTop: -10, marginBottom: 14 }}>
-              Solo recuerda empresa y correo para no volver a escribirlos — la contraseña nunca se
-              guarda. Para entrar sin escribir nada, activa la huella/Face ID desde Ajustes.
-            </p>
+            {!modoColapsado && (
+              <p className={styles.fieldHint} style={{ marginTop: -10, marginBottom: 14 }}>
+                Solo recuerda empresa y correo para no volver a escribirlos — la contraseña nunca se
+                guarda. Para entrar sin escribir nada, activa la huella/Face ID desde Ajustes.
+              </p>
+            )}
 
             <button type="submit" className={styles.btnLogin} disabled={loading}>
               {loading ? (
