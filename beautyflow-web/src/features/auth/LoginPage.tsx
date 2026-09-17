@@ -406,7 +406,6 @@ export function LoginPage() {
             </div>
           </div>
           <div className={styles.version}>
-            <span>© 2026 Estixa</span>
             <span>Versión {APP_VERSION}</span>
           </div>
         </div>
