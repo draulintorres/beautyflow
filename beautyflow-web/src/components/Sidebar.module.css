@@ -1,6 +1,20 @@
 .sidebar {
   width: var(--sidebar-w);
-  min-height: 100vh;
+  /* `height` (no `min-height`) + `overflow: hidden` acá: con `min-height`
+     el sidebar simplemente crecía más allá del viewport cuando el
+     contenido (marca + chip de empresa + los módulos que le tocan al
+     usuario + área de usuario/logout) no cabía en pantallas más bajas
+     (ej. ~800px de alto, común en laptops de 13-14") — y como es
+     `position: fixed`, esa parte que sobresalía no se podía alcanzar ni
+     con el scroll de la página (un elemento fixed no se mueve con el
+     scroll del documento) ni con uno propio (no había overflow-y acá).
+     El botón de "Salir" quedaba renderizado fuera de la pantalla, sin
+     forma de llegar a él. Ahora el alto queda fijo al viewport y es
+     `.nav` (ver abajo) quien hace su propio scroll cuando hace falta,
+     mientras la marca, el chip de empresa y el área de usuario/logout
+     se mantienen siempre visibles arriba y abajo. */
+  height: 100vh;
+  overflow: hidden;
   background: linear-gradient(180deg, var(--sidebar-1), var(--sidebar-2));
   border-right: 1px solid var(--line);
   display: flex;
@@ -98,6 +112,14 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Única sección que hace scroll dentro del sidebar — `min-height: 0` es
+     necesario para que un hijo flex con `overflow-y: auto` realmente
+     pueda encogerse y activar su propio scroll en vez de estirarse al
+     tamaño de su contenido (el comportamiento default de un flex item
+     ignoraría el overflow y seguiría empujando todo hacia abajo). */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .navItem {
   display: flex;
@@ -139,11 +161,6 @@
 .navIcon svg {
   width: 18px;
   height: 18px;
-}
-
-/* ---- Spacer ---- */
-.spacer {
-  flex: 1;
 }
 
 /* ---- User area ---- */

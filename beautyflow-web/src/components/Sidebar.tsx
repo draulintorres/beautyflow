@@ -206,8 +206,6 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className={styles.spacer} />
-
       {/* User + logout */}
       <div className={styles.userArea}>
         <div className={styles.avatar}>
