@@ -1,5 +1,55 @@
+import { useEffect, useRef, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useAuthStore } from '../store/auth';
+import { useSAAuthStore } from '../store/saAuth';
+import { usePortalAuth } from '../store/portalAuth';
 import styles from './UpdatePrompt.module.css';
+
+/** Store con el shape que expone el middleware `persist` de Zustand
+ * (`store.persist.hasHydrated()` / `.onFinishHydration()`), sin acoplarse
+ * al tipo de estado interno de cada store. */
+interface StoreConPersist {
+  persist: {
+    hasHydrated: () => boolean;
+    onFinishHydration: (listener: () => void) => () => void;
+  };
+}
+
+/** true recién cuando `store` terminó de leer lo guardado en
+ * localStorage/sessionStorage — antes de eso, el estado en memoria es solo
+ * el default inicial (`isAuthenticated: false`), que NO dice nada todavía
+ * sobre si hay o no una sesión real. Los 3 stores de auth de esta app usan
+ * storages síncronos (`localStorage`/`sessionStorage` directo, sin
+ * IndexedDB ni nada async), así que en la práctica esto ya es `true` desde
+ * el primer render — pero lo chequeamos explícito en vez de asumirlo, para
+ * no depender de que eso siga siendo cierto para siempre. */
+function useHidratado(store: StoreConPersist): boolean {
+  const [hidratado, setHidratado] = useState(store.persist.hasHydrated());
+  useEffect(() => {
+    if (hidratado) return;
+    return store.persist.onFinishHydration(() => setHidratado(true));
+  }, [hidratado, store]);
+  return hidratado;
+}
+
+/** true solo cuando los 3 stores de auth (tenant, super-admin, portal)
+ * terminaron de hidratarse — nunca decidir "no hay sesión" antes de esto,
+ * o un instante inicial con el default en falso podría disparar la
+ * auto-actualización aunque SÍ haya una sesión real guardada. */
+function useSesionActiva(): { listo: boolean; haySesion: boolean } {
+  const tenantListo = useHidratado(useAuthStore);
+  const saListo = useHidratado(useSAAuthStore);
+  const portalListo = useHidratado(usePortalAuth);
+
+  const tenantAuth = useAuthStore((s) => s.isAuthenticated);
+  const saAuth = useSAAuthStore((s) => s.isAuthenticated);
+  const portalToken = usePortalAuth((s) => s.accessToken);
+
+  return {
+    listo: tenantListo && saListo && portalListo,
+    haySesion: tenantAuth || saAuth || !!portalToken,
+  };
+}
 
 /**
  * Aviso de "nueva versión disponible" para la PWA.
@@ -18,6 +68,16 @@ import styles from './UpdatePrompt.module.css';
  * inesperado en segundo plano. El usuario decide cuándo hacer clic en
  * "Actualizar ahora".
  *
+ * EXCEPCIÓN (2026-09-21): sin sesión activa en ninguno de los 3 stores de
+ * auth (tenant/super-admin/portal) — típicamente alguien nuevo cayendo en
+ * una pantalla de login con un Service Worker viejo cacheado de una visita
+ * anterior (confirmado 2 veces: WhatsApp in-app browser, y un navegador de
+ * escritorio) — la actualización se aplica sola, sin esperar el clic. No
+ * hay nada que perder ahí, y es justo donde un tester nuevo se quedaba
+ * pegado viendo rutas rotas sin saber que "borrar datos del sitio" era la
+ * salida. Con sesión activa, el comportamiento de siempre no cambia en
+ * nada.
+ *
  * IMPORTANTE (2026-09-14): hasta esta fecha, `clientsClaim` NUNCA estuvo
  * activado en `vite.config.ts` (default de Workbox: false) — el service
  * worker nuevo se activaba al recibir el clic en "Actualizar ahora" pero
@@ -27,11 +87,36 @@ import styles from './UpdatePrompt.module.css';
  * visible y la pestaña se quedaba en la versión vieja para siempre, sin
  * importar cuántas veces se recargara a mano — confirmado como la causa
  * real de que ni F5 trajera la versión nueva. Ya está corregido en
- * `vite.config.ts` (`workbox.clientsClaim: true`) — sigue sin activarse
- * solo (`skipWaiting()` solo ocurre tras el mensaje que manda el clic de
- * abajo), solo hace que ese clic ahora sí se note.
+ * `vite.config.ts` (`workbox.clientsClaim: true`).
+ *
+ * OJO (2026-09-21) — `clientsClaim: true` tiene un efecto secundario que no
+ * es obvio a primera vista: cuando UNA pestaña activa la versión nueva, esa
+ * versión toma control de TODAS las pestañas abiertas del mismo sitio, no
+ * solo la que la pidió — y `vite-plugin-pwa` trae cableado un reload
+ * automático e INCONDICIONAL en cada pestaña que reacciona a eso (evento
+ * 'controlling' de workbox-window, por debajo `controllerchange`), sin
+ * mirar para nada si esa pestaña en particular tiene una sesión activa.
+ * Confirmado con una prueba real (Playwright): una pestaña con sesión
+ * seteada SÍ se recargaba sola con la primera versión de este archivo,
+ * disparada por una pestaña de login sin sesión actualizándose al lado —
+ * el chequeo de sesión de más abajo NO alcanzaba para evitarlo, porque
+ * solo decidía si ESTA pestaña pide la actualización, no si debe
+ * recargarse cuando la pide OTRA. Por eso el `onNeedReload` de acá abajo:
+ * es el único punto donde CADA pestaña decide, con su PROPIO estado de
+ * sesión (vía `sesionRef`, no una variable capturada al montar — el
+ * evento puede llegar mucho después de que cambie), si a ELLA le toca
+ * recargarse o no cuando el control cambia.
  */
 export function UpdatePrompt() {
+  const { listo, haySesion } = useSesionActiva();
+  // El callback de más abajo lo registra `useRegisterSW` una sola vez al
+  // montar y puede dispararse mucho después (cuando OTRA pestaña activa la
+  // actualización) — sin este ref, usaría el `listo`/`haySesion` de aquel
+  // primer render (cerrado sobre el callback), ya desactualizado para
+  // cuando el evento realmente llega.
+  const sesionRef = useRef({ listo, haySesion });
+  sesionRef.current = { listo, haySesion };
+
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -52,14 +137,50 @@ export function UpdatePrompt() {
       };
       document.addEventListener('visibilitychange', alVolver);
     },
+    // Se dispara cuando el service worker nuevo YA tomó control de ESTA
+    // pestaña — sin importar en cuál pestaña se originó la actualización
+    // (ver nota de arriba). Sin sesión: recargar ya, es el caso sano que
+    // se quiere arreglar. Con sesión activa (o mientras los stores
+    // todavía no terminan de hidratar — nunca asumir "sin sesión" sin
+    // estar seguros): NO recargar, la pestaña sigue corriendo en memoria
+    // con el JS viejo hasta que la persona la recargue o navegue por su
+    // cuenta, sin perder nada de lo que tenía a medio llenar.
+    onNeedReload() {
+      if (!sesionRef.current.listo || sesionRef.current.haySesion) return;
+      window.location.reload();
+    },
   });
 
+  useEffect(() => {
+    // `listo` primero: sin los 3 stores hidratados no sabemos de verdad si
+    // hay sesión o no — nunca decidir con el default en falso.
+    if (needRefresh && listo && !haySesion) {
+      updateServiceWorker(true);
+    }
+  }, [needRefresh, listo, haySesion, updateServiceWorker]);
+
   if (!needRefresh) return null;
+  // Sin sesión: se auto-actualiza por el efecto de arriba (o todavía se
+  // está determinando si hay sesión) — en ambos casos, sin banner.
+  if (!listo || !haySesion) return null;
 
   return (
     <div className={styles.banner}>
       <span>Hay una nueva versión de Estixa disponible.</span>
-      <button onClick={() => updateServiceWorker(true)}>Actualizar ahora</button>
+      <button
+        onClick={async () => {
+          // No depender de que siga habiendo un worker "esperando" para
+          // este momento — si otra pestaña sin sesión ya lo consumió en
+          // segundo plano (el nuevo SW ya está activo, solo no recargó
+          // esta pestaña por tener sesión), `updateServiceWorker` no
+          // tendría nada que hacer. El clic es un pedido explícito de la
+          // persona: recargar siempre, sea cual sea el estado del SW.
+          await updateServiceWorker(true);
+          window.location.reload();
+        }}
+      >
+        Actualizar ahora
+      </button>
     </div>
   );
 }
