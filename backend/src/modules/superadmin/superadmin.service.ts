@@ -255,6 +255,10 @@ export class SuperAdminService {
     // relanzar el error: mismo criterio que forgotPassword() en
     // auth.service.ts). No lleva la contraseña — se comunica aparte.
     const loginUrl = `${this.frontendUrl}/login`;
+    // Sin guiones en el correo: el login ya tolera que se escriba el slug
+    // sin ellos (resolverEmpresaPorSlug), y así es más simple de teclear
+    // que copiar los guiones exactos.
+    const slugSinGuiones = resultado.slug.replace(/-/g, '');
     void this.email.enviar(
       dto.ownerEmail,
       `Bienvenido a Estixa — ${resultado.nombre}`,
@@ -263,7 +267,7 @@ export class SuperAdminService {
         <p>Tu empresa <b>${resultado.nombre}</b> ya está lista en Estixa.</p>
         <p>Iniciá sesión desde <a href="${loginUrl}">${loginUrl}</a> con estos datos:</p>
         <p>
-          Empresa: <b>${resultado.slug}</b><br>
+          Empresa: <b>${slugSinGuiones}</b><br>
           Correo: <b>${dto.ownerEmail}</b>
         </p>
         <p>La primera vez que entres te vamos a pedir crear tu propia contraseña.</p>
