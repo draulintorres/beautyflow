@@ -24,6 +24,7 @@ import {
   VentaOrigen,
   LineaTipo,
   CitaStatus,
+  RoleKey,
   MovimientoInventarioTipo,
   MovimientoCreditoTipo,
   ComisionBase,
@@ -1299,12 +1300,37 @@ export class VentasService {
       where: { activo: true },
       select: { id: true, sucursalId: true },
     });
-    if (!any) {
-      throw new BadRequestException(
-        'No hay empleados registrados para asociar la venta',
-      );
+    if (any) return any;
+
+    // Empresa nueva sin ningún empleado registrado todavía: el OWNER debe
+    // poder cobrar desde el primer día sin depender de haber cargado
+    // cajeros/recepcionistas antes. `Venta.empleadoId` es una FK real a
+    // `Empleado` (no puede apuntar a `Usuario` directo), así que se le crea
+    // acá, una sola vez, un `Empleado` propio ligado a su usuario — el
+    // `findFirst` de arriba lo va a encontrar y reusar en cobros futuros.
+    // Solo para OWNER: cualquier otro rol sin empleado propio ni empleados
+    // activos en la empresa sigue viendo el error de siempre (caso ya
+    // cubierto hoy por el flujo normal de Equipo, que crea el Empleado
+    // antes que el Usuario).
+    const user = getCurrentUser();
+    if (user.rol === RoleKey.OWNER) {
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        select: { nombre: true },
+      });
+      return this.prisma.db.empleado.create({
+        data: {
+          usuarioId,
+          nombre: usuario?.nombre ?? 'Dueño',
+          activo: true,
+        } as any,
+        select: { id: true, sucursalId: true },
+      });
     }
-    return any;
+
+    throw new BadRequestException(
+      'No hay empleados registrados para asociar la venta',
+    );
   }
 
   // ============ CANDADO DE PIN (Parte B) — rate limit simple ============
