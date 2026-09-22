@@ -140,15 +140,42 @@ export class SuperAdminService {
         },
       });
 
-      // Rol OWNER
-      const rolOwner = await tx.rol.create({
-        data: {
-          empresaId: empresa.id,
-          nombre: 'Dueño',
-          roleKey: RoleKey.OWNER,
-          esSistema: true,
-        },
-      });
+      // Catálogo completo de roles (mismo patrón que prisma/seed.ts) — el
+      // sistema de permisos ya asume estos 11 roles fijos, hardcodeados en
+      // `permisos.matrix.ts` (MATRIZ por RoleKey), así que toda empresa
+      // nueva los necesita desde el día uno para poder dar acceso a
+      // alguien sin que ese alguien termine siendo OWNER (único rol que
+      // existía hasta ahora, ver commit anterior). No se filtra por
+      // vertical de negocio — es el mismo catálogo fijo para todas.
+      const ROLES_ESTANDAR: { nombre: string; roleKey: RoleKey }[] = [
+        { nombre: 'Dueño', roleKey: RoleKey.OWNER },
+        { nombre: 'Administrador', roleKey: RoleKey.ADMIN },
+        { nombre: 'Encargado', roleKey: RoleKey.MANAGER },
+        { nombre: 'Cajero', roleKey: RoleKey.CASHIER },
+        { nombre: 'Recepción', roleKey: RoleKey.RECEPCION },
+        { nombre: 'Estilista', roleKey: RoleKey.ESTILISTA },
+        { nombre: 'Manicurista', roleKey: RoleKey.MANICURISTA },
+        { nombre: 'Barbero', roleKey: RoleKey.BARBERO },
+        { nombre: 'Esteticista', roleKey: RoleKey.ESTETICISTA },
+        { nombre: 'Masajista', roleKey: RoleKey.MASAJISTA },
+        { nombre: 'Inquilino', roleKey: RoleKey.ALQUILER },
+      ];
+      // Secuencial (no Promise.all) — varias queries concurrentes sobre el
+      // mismo `tx` de una transacción interactiva de Prisma no son seguras.
+      const rolesCreados: { id: string; roleKey: RoleKey }[] = [];
+      for (const r of ROLES_ESTANDAR) {
+        rolesCreados.push(
+          await tx.rol.create({
+            data: {
+              empresaId: empresa.id,
+              nombre: r.nombre,
+              roleKey: r.roleKey,
+              esSistema: true,
+            },
+          }),
+        );
+      }
+      const rolOwner = rolesCreados.find((r) => r.roleKey === RoleKey.OWNER)!;
 
       // Usuario OWNER
       await tx.usuario.create({
