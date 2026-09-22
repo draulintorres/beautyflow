@@ -55,7 +55,10 @@ export class AuthService {
     this.webauthnRpId = this.config.getOrThrow('WEBAUTHN_RP_ID');
     this.webauthnOrigin = this.config.getOrThrow('WEBAUTHN_ORIGIN');
     this.webauthnRpName = this.config.get('WEBAUTHN_RP_NAME') ?? 'Estixa';
-    this.frontendUrl = this.config.getOrThrow('FRONTEND_URL');
+    // Sin barra final — en Render la variable de entorno FRONTEND_URL viene
+    // con una al final, y concatenarla tal cual generaba enlaces con doble
+    // barra ("...onrender.com//reset-password").
+    this.frontendUrl = this.config.getOrThrow('FRONTEND_URL').replace(/\/+$/, '');
   }
 
   /**

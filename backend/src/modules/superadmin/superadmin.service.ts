@@ -45,7 +45,9 @@ export class SuperAdminService {
     private readonly modulosEfectivos: ModulosEfectivosService,
     private readonly email: EmailService,
   ) {
-    this.frontendUrl = this.config.getOrThrow('FRONTEND_URL');
+    // Sin barra final — ver mismo fix en auth.service.ts (FRONTEND_URL en
+    // Render viene con una al final).
+    this.frontendUrl = this.config.getOrThrow('FRONTEND_URL').replace(/\/+$/, '');
   }
 
   // ============ AUTH ============
@@ -259,7 +261,11 @@ export class SuperAdminService {
       `
         <p>¡Hola${dto.ownerNombre ? ` ${dto.ownerNombre}` : ''}!</p>
         <p>Tu empresa <b>${resultado.nombre}</b> ya está lista en Estixa.</p>
-        <p>Iniciá sesión con tu correo <b>${dto.ownerEmail}</b> desde <a href="${loginUrl}">${loginUrl}</a>.</p>
+        <p>Iniciá sesión desde <a href="${loginUrl}">${loginUrl}</a> con estos datos:</p>
+        <p>
+          Empresa: <b>${resultado.slug}</b><br>
+          Correo: <b>${dto.ownerEmail}</b>
+        </p>
         <p>La primera vez que entres te vamos a pedir crear tu propia contraseña.</p>
       `,
     );
