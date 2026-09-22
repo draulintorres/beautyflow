@@ -186,22 +186,11 @@ export function AjustesPage() {
     queryFn: () => api.get('/metodos-pago').then((r) => r.data),
     enabled: esOwner,
   });
-  const [nuevoMetodo, setNuevoMetodo] = useState('');
 
   function invalidarMetodosPago() {
     qc.invalidateQueries({ queryKey: ['metodos-pago'] });
     qc.invalidateQueries({ queryKey: ['pos-metodos'] });
   }
-
-  const crearMetodo = useMutation({
-    mutationFn: (nombre: string) => api.post('/metodos-pago', { nombre }).then((r) => r.data),
-    onSuccess: () => {
-      setNuevoMetodo('');
-      invalidarMetodosPago();
-      showToast('Método de pago agregado.');
-    },
-    onError: (e) => showToast(errMsg(e), false),
-  });
 
   const patchMetodo = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Pick<MetodoPago, 'activo' | 'orden'>> }) =>
@@ -455,8 +444,8 @@ export function AjustesPage() {
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Métodos de Pago</h2>
           <p className={styles.fieldHint} style={{ marginBottom: 12 }}>
-            Los métodos activos son los que aparecen para elegir al cobrar en el POS. "Efectivo" ya
-            viene activado — agrega Tarjeta, Transferencia u otros que uses en tu negocio.
+            Los métodos activos son los que aparecen para elegir al cobrar en el POS. Activa los que
+            uses en tu negocio — "Efectivo" ya viene activado.
           </p>
 
           {metodosPago.length > 0 && (
@@ -501,30 +490,6 @@ export function AjustesPage() {
               ))}
             </div>
           )}
-
-          <div className={styles.pinRow}>
-            <div className={styles.formField}>
-              <label htmlFor="ajNuevoMetodo">Agregar método</label>
-              <input
-                id="ajNuevoMetodo"
-                placeholder="Ej: Tarjeta, Transferencia"
-                value={nuevoMetodo}
-                onChange={(e) => setNuevoMetodo(e.target.value)}
-                maxLength={60}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && nuevoMetodo.trim()) crearMetodo.mutate(nuevoMetodo.trim());
-                }}
-              />
-            </div>
-            <button
-              type="button"
-              className={styles.btnPin}
-              disabled={!nuevoMetodo.trim() || crearMetodo.isPending}
-              onClick={() => crearMetodo.mutate(nuevoMetodo.trim())}
-            >
-              {crearMetodo.isPending ? 'Agregando…' : 'Agregar'}
-            </button>
-          </div>
         </div>
       )}
 
