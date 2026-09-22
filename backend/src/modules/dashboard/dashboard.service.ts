@@ -221,8 +221,13 @@ export class DashboardService {
   }
 
   // ============ GRÁFICAS ============
-  async graficas(sucursalIdReq?: string) {
+  async graficas(sucursalIdReq?: string, anioReq?: string) {
     const sucursalId = await this.scopeSucursalId(sucursalIdReq);
+    // Solo un año de 4 dígitos razonable pasa a la consulta — cualquier
+    // otra cosa se ignora y cae al comportamiento por defecto (últimos 12
+    // meses), igual que `scopeSucursalId` ignora un sucursalId inválido.
+    const anio =
+      anioReq && /^(19|20)\d{2}$/.test(anioReq) ? Number(anioReq) : undefined;
 
     const [
       ventas12Meses,
@@ -232,7 +237,7 @@ export class DashboardService {
       formasPago,
       flujoCaja,
     ] = await Promise.all([
-      this.ventasUltimos12Meses(sucursalId),
+      this.ventasUltimos12Meses(sucursalId, anio),
       this.ventasPorSucursal(sucursalId),
       this.itemsMasVendidos(LineaTipo.SERVICIO, sucursalId),
       this.itemsMasVendidos(LineaTipo.PRODUCTO, sucursalId),
@@ -271,17 +276,31 @@ export class DashboardService {
   // IMPLEMENTACIONES
   // ----------------------------------------------------------------
 
-  private async ventasUltimos12Meses(sucursalId: string | null) {
+  private async ventasUltimos12Meses(
+    sucursalId: string | null,
+    anio?: number,
+  ) {
     const empresaId = getEmpresaId();
-    const desde = new Date();
-    desde.setMonth(desde.getMonth() - 11);
-    desde.setDate(1);
-    desde.setHours(0, 0, 0, 0);
+    let desde: Date;
+    let hasta: Date | undefined;
+    if (anio) {
+      // "Año pasado" (o cualquier año calendario explícito): enero-diciembre
+      // completo de ese año, no una ventana móvil.
+      desde = new Date(anio, 0, 1);
+      hasta = new Date(anio + 1, 0, 1);
+    } else {
+      // Por defecto ("Este año" / sin selector): ventana móvil de los
+      // últimos 12 meses, comportamiento de siempre.
+      desde = new Date();
+      desde.setMonth(desde.getMonth() - 11);
+      desde.setDate(1);
+      desde.setHours(0, 0, 0, 0);
+    }
 
     const ventas = await this.prisma.db.venta.findMany({
       where: {
         ...this.sucFilter(sucursalId),
-        createdAt: { gte: desde },
+        createdAt: { gte: desde, ...(hasta && { lt: hasta }) },
         estado: { not: VentaStatus.ANULADA },
       },
       select: { createdAt: true, total: true },
@@ -418,10 +437,15 @@ export class DashboardService {
     // Ingresos generados por empleado (líneas de venta donde ejecutó).
     // Si la vista está aislada, se cuentan solo las líneas de ventas de esa
     // sucursal — sin importar a qué sucursal esté asignado el empleado.
+    // `esCuentaDueno: false` excluye el Empleado fantasma que se autocrea
+    // para el dueño (resolveEmpleadoRegistra) — mismo criterio que
+    // LimitsService y `empleadosServicio` del POS: no es personal
+    // contratado, no tiene sentido compararlo contra empleados reales.
     const grupos = await this.prisma.db.detalleVenta.groupBy({
       by: ['empleadoId'],
       where: {
         empleadoId: { not: null },
+        empleado: { esCuentaDueno: false },
         ...this.sucFilterViaVenta(sucursalId),
       } as Prisma.DetalleVentaWhereInput,
       _sum: { subtotal: true, comisionMonto: true },

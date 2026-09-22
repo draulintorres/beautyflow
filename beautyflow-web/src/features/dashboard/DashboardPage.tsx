@@ -123,13 +123,20 @@ export function DashboardPage() {
   const sucSelNombre = sucSel ? sucursales!.find(s => s.sucursalId === sucSel)?.nombre : null;
   const sucQS = sucSel ? `?sucursalId=${sucSel}` : '';
 
+  // Selector "Este año / Año pasado" de "Ventas de los últimos 12 meses".
+  // "actual" = comportamiento de siempre (ventana móvil de los últimos 12
+  // meses, sin mandar `anio`); "pasado" = año calendario completo anterior.
+  const [anioSel, setAnioSel] = useState<'actual' | 'pasado'>('actual');
+  const anioQS = anioSel === 'pasado' ? `anio=${new Date().getFullYear() - 1}` : '';
+  const graficasQS = [sucSel && `sucursalId=${sucSel}`, anioQS].filter(Boolean).join('&');
+
   const { data: kpis, isLoading: kL } = useQuery<Kpis>({
     queryKey: ['dashboard-kpis', sucSel],
     queryFn: () => api.get(`/dashboard/kpis${sucQS}`).then(r => r.data),
   });
   const { data: graficas, isLoading: gL } = useQuery<Graficas>({
-    queryKey: ['dashboard-graficas', sucSel],
-    queryFn: () => api.get(`/dashboard/graficas${sucQS}`).then(r => r.data),
+    queryKey: ['dashboard-graficas', sucSel, anioSel],
+    queryFn: () => api.get(`/dashboard/graficas${graficasQS ? `?${graficasQS}` : ''}`).then(r => r.data),
   });
   const { data: rankings, isLoading: rL } = useQuery<Rankings>({
     queryKey: ['dashboard-rankings', sucSel],
@@ -243,7 +250,16 @@ export function DashboardPage() {
       {/* ─── Línea + Donut categorías ─── */}
       <div className={styles.row2}>
         <Panel title="Ventas de los últimos 12 meses"
-          extra={<span className={styles.sel}>Este año ▾</span>}>
+          extra={
+            <select
+              className={styles.sel}
+              value={anioSel}
+              onChange={e => setAnioSel(e.target.value as 'actual' | 'pasado')}
+            >
+              <option value="actual">Este año</option>
+              <option value="pasado">Año pasado</option>
+            </select>
+          }>
           <LineChart data={graficas?.ventas12Meses ?? []} />
         </Panel>
         <Panel title="Ventas por categoría">

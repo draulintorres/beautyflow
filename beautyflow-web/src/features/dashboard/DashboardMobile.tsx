@@ -211,11 +211,13 @@ export function DashboardMobile({ kpis, rankings, sucursales, sucSel, onSelSucur
       </div>
 
       {/* ─── Top empleados ─── */}
-      {(rankings?.topEmpleados ?? []).length > 0 && (
-        <div className={styles.section}>
-          <div className={styles.secHead}>
-            <span className={styles.secTitle}>Top empleados</span>
-          </div>
+      <div className={styles.section}>
+        <div className={styles.secHead}>
+          <span className={styles.secTitle}>Top empleados</span>
+        </div>
+        {(rankings?.topEmpleados ?? []).length === 0 ? (
+          <div className={styles.empty}>Sin datos de empleados aún</div>
+        ) : (
           <div className={styles.empList}>
             {rankings!.topEmpleados.slice(0, 3).map((e, i) => (
               <div key={e.empleadoId} className={styles.empRow}>
@@ -226,8 +228,8 @@ export function DashboardMobile({ kpis, rankings, sucursales, sucSel, onSelSucur
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ─── Comisiones pendientes ─── */}
       <div className={styles.section}>

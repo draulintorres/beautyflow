@@ -23,9 +23,18 @@ export class DashboardController {
     return this.dashboard.kpis(sucursalId);
   }
 
+  /**
+   * `anio` (opcional): selector "Este año / Año pasado" de la tarjeta
+   * "Ventas de los últimos 12 meses". Sin `anio` → comportamiento de
+   * siempre (ventana móvil de los últimos 12 meses). Con `anio` → ese año
+   * calendario completo (enero-diciembre).
+   */
   @Get('graficas')
-  graficas(@Query('sucursalId') sucursalId?: string) {
-    return this.dashboard.graficas(sucursalId);
+  graficas(
+    @Query('sucursalId') sucursalId?: string,
+    @Query('anio') anio?: string,
+  ) {
+    return this.dashboard.graficas(sucursalId, anio);
   }
 
   @Get('rankings')
