@@ -28,8 +28,8 @@ export class MetodosPagoController {
 
   @Get()
   @Modulos('pos', 'cobros')
-  findAll() {
-    return this.metodos.findAll();
+  findAll(@Query('incluirInactivos') incluirInactivos?: string) {
+    return this.metodos.findAll(incluirInactivos === 'true');
   }
 
   @Post()

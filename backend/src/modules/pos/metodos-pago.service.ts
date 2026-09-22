@@ -11,8 +11,13 @@ import { CreateMetodoPagoDto, UpdateMetodoPagoDto } from './dto/caja.dto';
 export class MetodosPagoService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
+  // Por defecto, solo activos — quien cobra (POS, Cuentas por Cobrar) nunca
+  // debe poder elegir un método que el dueño desactivó. Ajustes es la
+  // única pantalla que necesita ver también los inactivos (para poder
+  // reactivarlos), y lo pide explícito con `incluirInactivos`.
+  async findAll(incluirInactivos = false) {
     return this.prisma.db.metodoPago.findMany({
+      where: incluirInactivos ? undefined : { activo: true },
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
     });
   }

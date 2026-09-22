@@ -176,14 +176,19 @@ export function AjustesPage() {
   });
 
   // Métodos de pago (Ajustes, exclusivo OWNER) — mismo endpoint que ya usa
-  // el POS (PosPage/PosMobile/CuentasPorCobrar), así que hay que invalidar
-  // AMBAS query keys que ellos usan para el mismo GET (`metodos-pago` y
-  // `pos-metodos` — quedaron con nombres distintos de antes, no es algo
-  // que valga la pena unificar en esta ronda) para que un cambio acá se
-  // refleje ahí sin recargar la página.
+  // el POS (PosPage/PosMobile/CuentasPorCobrar), pero pidiendo también los
+  // inactivos (`incluirInactivos=true`, único lugar que los necesita, para
+  // poder reactivarlos con el switch). Query key PROPIA (`['metodos-pago',
+  // 'todos']`), no la misma que usan esas pantallas (`['metodos-pago']` /
+  // `['pos-metodos']`) — comparten el mismo endpoint pero devuelven listas
+  // distintas (todos vs. solo activos), así que compartir key haría que se
+  // pisaran entre sí en el caché de React Query según quién fetcheara
+  // último. `invalidateQueries({queryKey:['metodos-pago']})` igual alcanza
+  // a invalidar esta también, por el match de prefijo (por defecto no es
+  // `exact`), así que un solo invalidate cubre las tres.
   const { data: metodosPago = [] } = useQuery<MetodoPago[]>({
-    queryKey: ['metodos-pago'],
-    queryFn: () => api.get('/metodos-pago').then((r) => r.data),
+    queryKey: ['metodos-pago', 'todos'],
+    queryFn: () => api.get('/metodos-pago', { params: { incluirInactivos: true } }).then((r) => r.data),
     enabled: esOwner,
   });
 

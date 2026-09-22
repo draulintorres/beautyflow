@@ -15,7 +15,7 @@ interface Cliente {
   etiquetas?: string[];
 }
 interface Empleado { id: string; nombre: string; activo: boolean; participaAgenda: boolean; }
-interface MetodoPago { id: string; nombre: string; esEfectivo: boolean; orden: number; }
+interface MetodoPago { id: string; nombre: string; esEfectivo: boolean; activo: boolean; orden: number; }
 
 interface Linea {
   key: string; tipo: 'SERVICIO' | 'PRODUCTO'; refId: string; nombre: string;
@@ -612,7 +612,10 @@ function PagoSheet({ total, metodos, clientePermiteFiao, creditoDisponible, onCl
         {restante > 0 && !fiao && (
           <div className={styles.pagoForm}>
             <div className={styles.metodos}>
-              {metodos.map(m => (
+              {/* El backend ya solo manda activos por defecto — este
+                  filtro es nada más una segunda capa, igual que en
+                  PosPage.tsx, para que el grid nunca dependa solo de eso. */}
+              {metodos.filter(m => m.activo).map(m => (
                 <button
                   key={m.id}
                   className={`${styles.metodo} ${metodoSel === m.id ? styles.metodoOn : ''}`}
@@ -622,7 +625,7 @@ function PagoSheet({ total, metodos, clientePermiteFiao, creditoDisponible, onCl
                 </button>
               ))}
             </div>
-            {metodos.length === 0 && !clientePermiteFiao && (
+            {metodos.filter(m => m.activo).length === 0 && !clientePermiteFiao && (
               <div className={styles.fiaoWarn}>
                 No hay métodos de pago configurados. Contacta a soporte para configurarlos.
               </div>
