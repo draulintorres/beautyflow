@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { CreateMetodoPagoDto, UpdateMetodoPagoDto } from './dto/caja.dto';
@@ -17,18 +18,40 @@ export class MetodosPagoService {
   }
 
   async create(dto: CreateMetodoPagoDto) {
+    const nombre = dto.nombre.trim();
+    if (!nombre) throw new BadRequestException('El nombre no puede estar vacío');
+
+    // Sin distinguir mayúsculas/minúsculas — "efectivo" y "Efectivo" son
+    // el mismo método de pago para quien está cobrando.
     const existe = await this.prisma.db.metodoPago.findFirst({
-      where: { nombre: dto.nombre },
+      where: { nombre: { equals: nombre, mode: 'insensitive' } },
       select: { id: true },
     });
     if (existe) {
       throw new ConflictException('Ya existe un método de pago con ese nombre');
     }
+
+    // `orden` autoasignado al final de la lista — el frontend (pantalla de
+    // Ajustes) no manda uno, solo el nombre.
+    let orden = dto.orden;
+    if (orden === undefined) {
+      const ultimo = await this.prisma.db.metodoPago.findFirst({
+        orderBy: { orden: 'desc' },
+        select: { orden: true },
+      });
+      orden = (ultimo?.orden ?? 0) + 1;
+    }
+
     return this.prisma.db.metodoPago.create({
       data: {
-        nombre: dto.nombre,
-        esEfectivo: dto.esEfectivo ?? false,
-        orden: dto.orden ?? 0,
+        nombre,
+        // `esEfectivo: true` queda reservado para el único método
+        // "Efectivo" que se siembra al crear la empresa
+        // (superadmin.service.ts) — cualquier método creado desde acá
+        // (Ajustes) es explícitamente `false`, sin importar qué mande el
+        // caller.
+        esEfectivo: false,
+        orden,
         activo: dto.activo ?? true,
       } as any,
     });

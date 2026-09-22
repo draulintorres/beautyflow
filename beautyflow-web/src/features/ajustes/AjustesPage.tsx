@@ -20,6 +20,14 @@ interface DispositivoHuella {
   lastUsedAt: string | null;
 }
 
+interface MetodoPago {
+  id: string;
+  nombre: string;
+  esEfectivo: boolean;
+  activo: boolean;
+  orden: number;
+}
+
 interface EmpresaAjustes {
   nombre: string;
   rnc: string | null;
@@ -166,6 +174,65 @@ export function AjustesPage() {
     },
     onError: (e) => showToast(errMsg(e), false),
   });
+
+  // Métodos de pago (Ajustes, exclusivo OWNER) — mismo endpoint que ya usa
+  // el POS (PosPage/PosMobile/CuentasPorCobrar), así que hay que invalidar
+  // AMBAS query keys que ellos usan para el mismo GET (`metodos-pago` y
+  // `pos-metodos` — quedaron con nombres distintos de antes, no es algo
+  // que valga la pena unificar en esta ronda) para que un cambio acá se
+  // refleje ahí sin recargar la página.
+  const { data: metodosPago = [] } = useQuery<MetodoPago[]>({
+    queryKey: ['metodos-pago'],
+    queryFn: () => api.get('/metodos-pago').then((r) => r.data),
+    enabled: esOwner,
+  });
+  const [nuevoMetodo, setNuevoMetodo] = useState('');
+
+  function invalidarMetodosPago() {
+    qc.invalidateQueries({ queryKey: ['metodos-pago'] });
+    qc.invalidateQueries({ queryKey: ['pos-metodos'] });
+  }
+
+  const crearMetodo = useMutation({
+    mutationFn: (nombre: string) => api.post('/metodos-pago', { nombre }).then((r) => r.data),
+    onSuccess: () => {
+      setNuevoMetodo('');
+      invalidarMetodosPago();
+      showToast('Método de pago agregado.');
+    },
+    onError: (e) => showToast(errMsg(e), false),
+  });
+
+  const patchMetodo = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Pick<MetodoPago, 'activo' | 'orden'>> }) =>
+      api.patch(`/metodos-pago/${id}`, data).then((r) => r.data),
+    onSuccess: () => invalidarMetodosPago(),
+    onError: (e) => showToast(errMsg(e), false),
+  });
+
+  function toggleActivo(m: MetodoPago) {
+    // Apagar el último método activo no se bloquea (el POS ya avisa y
+    // bloquea el cobro cuando no hay ninguno) — solo se advierte antes,
+    // para que no pase por accidente.
+    if (m.activo && metodosPago.filter((x) => x.activo).length === 1) {
+      const ok = window.confirm(
+        'Este es tu único método de pago activo. Si lo desactivas, no podrás cobrar hasta activar otro. ¿Confirmar?',
+      );
+      if (!ok) return;
+    }
+    patchMetodo.mutate({ id: m.id, data: { activo: !m.activo } });
+  }
+
+  function moverMetodo(m: MetodoPago, direccion: -1 | 1) {
+    const ordenados = [...metodosPago].sort((a, b) => a.orden - b.orden);
+    const idx = ordenados.findIndex((x) => x.id === m.id);
+    const vecino = ordenados[idx + direccion];
+    if (!vecino) return;
+    // Swap de `orden` entre los dos — dos PATCH secuenciales, no hay
+    // endpoint de reordenamiento masivo y no hace falta para 2 filas.
+    patchMetodo.mutate({ id: m.id, data: { orden: vecino.orden } });
+    patchMetodo.mutate({ id: vecino.id, data: { orden: m.orden } });
+  }
 
   const pinInvalido = pinNuevo.length > 0 && !/^\d{4,8}$/.test(pinNuevo);
 
@@ -380,6 +447,83 @@ export function AjustesPage() {
                 <span className={styles.toggleTrack} />
               </label>
             </div>
+          </div>
+        </div>
+      )}
+
+      {esOwner && (
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Métodos de Pago</h2>
+          <p className={styles.fieldHint} style={{ marginBottom: 12 }}>
+            Los métodos activos son los que aparecen para elegir al cobrar en el POS. "Efectivo" ya
+            viene activado — agrega Tarjeta, Transferencia u otros que uses en tu negocio.
+          </p>
+
+          {metodosPago.length > 0 && (
+            <div className={styles.dispositivosList} style={{ marginBottom: 14 }}>
+              {[...metodosPago].sort((a, b) => a.orden - b.orden).map((m, i, arr) => (
+                <div key={m.id} className={styles.dispositivoRow}>
+                  <div className={styles.metodoOrdenBtns}>
+                    <button
+                      type="button"
+                      className={styles.metodoOrdenBtn}
+                      disabled={i === 0 || patchMetodo.isPending}
+                      onClick={() => moverMetodo(m, -1)}
+                      title="Subir"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.metodoOrdenBtn}
+                      disabled={i === arr.length - 1 || patchMetodo.isPending}
+                      onClick={() => moverMetodo(m, 1)}
+                      title="Bajar"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                  <div className={styles.dispositivoNombre} style={{ flex: 1 }}>
+                    {m.nombre}
+                    {m.esEfectivo && <span className={styles.dispositivoTag}>efectivo</span>}
+                    {!m.activo && <span className={styles.fieldHint}>· inactivo</span>}
+                  </div>
+                  <label className={styles.toggleSwitch}>
+                    <input
+                      type="checkbox"
+                      checked={m.activo}
+                      disabled={patchMetodo.isPending}
+                      onChange={() => toggleActivo(m)}
+                    />
+                    <span className={styles.toggleTrack} />
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className={styles.pinRow}>
+            <div className={styles.formField}>
+              <label htmlFor="ajNuevoMetodo">Agregar método</label>
+              <input
+                id="ajNuevoMetodo"
+                placeholder="Ej: Tarjeta, Transferencia"
+                value={nuevoMetodo}
+                onChange={(e) => setNuevoMetodo(e.target.value)}
+                maxLength={60}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && nuevoMetodo.trim()) crearMetodo.mutate(nuevoMetodo.trim());
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              className={styles.btnPin}
+              disabled={!nuevoMetodo.trim() || crearMetodo.isPending}
+              onClick={() => crearMetodo.mutate(nuevoMetodo.trim())}
+            >
+              {crearMetodo.isPending ? 'Agregando…' : 'Agregar'}
+            </button>
           </div>
         </div>
       )}
