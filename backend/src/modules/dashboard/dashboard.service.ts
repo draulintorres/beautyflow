@@ -221,13 +221,19 @@ export class DashboardService {
   }
 
   // ============ GRÁFICAS ============
-  async graficas(sucursalIdReq?: string, anioReq?: string) {
+  async graficas(sucursalIdReq?: string, anioReq?: string, mesReq?: string) {
     const sucursalId = await this.scopeSucursalId(sucursalIdReq);
     // Solo un año de 4 dígitos razonable pasa a la consulta — cualquier
     // otra cosa se ignora y cae al comportamiento por defecto (últimos 12
     // meses), igual que `scopeSucursalId` ignora un sucursalId inválido.
     const anio =
       anioReq && /^(19|20)\d{2}$/.test(anioReq) ? Number(anioReq) : undefined;
+    // `mes` (1-12, opcional): filtro "Enero".."Diciembre" de la tarjeta
+    // "Ventas de los últimos 12 meses" — cuando viene, cambia el gráfico
+    // de 12 puntos mensuales a un desglose diario de ESE mes (del `anio`
+    // elegido, o el año actual si no se eligió ninguno).
+    const mes =
+      mesReq && /^([1-9]|1[0-2])$/.test(mesReq) ? Number(mesReq) : undefined;
 
     const [
       ventas12Meses,
@@ -237,7 +243,7 @@ export class DashboardService {
       formasPago,
       flujoCaja,
     ] = await Promise.all([
-      this.ventasUltimos12Meses(sucursalId, anio),
+      this.ventasUltimos12Meses(sucursalId, anio, mes),
       this.ventasPorSucursal(sucursalId),
       this.itemsMasVendidos(LineaTipo.SERVICIO, sucursalId),
       this.itemsMasVendidos(LineaTipo.PRODUCTO, sucursalId),
@@ -279,8 +285,45 @@ export class DashboardService {
   private async ventasUltimos12Meses(
     sucursalId: string | null,
     anio?: number,
+    mes?: number,
   ) {
     const empresaId = getEmpresaId();
+
+    if (mes) {
+      // Filtro "Enero".."Diciembre": un mes específico del `anio` elegido
+      // (o el actual si no se eligió año) — desglose por día, no por mes,
+      // ya que un solo punto mensual no dice nada.
+      const anioMes = anio ?? new Date().getFullYear();
+      const desde = new Date(anioMes, mes - 1, 1);
+      const hasta = new Date(anioMes, mes, 1);
+
+      const ventasDia = await this.prisma.db.venta.findMany({
+        where: {
+          ...this.sucFilter(sucursalId),
+          createdAt: { gte: desde, lt: hasta },
+          estado: { not: VentaStatus.ANULADA },
+        },
+        select: { createdAt: true, total: true },
+      });
+
+      const mapaDia = new Map<string, number>();
+      const diasEnMes = new Date(anioMes, mes, 0).getDate();
+      for (let dia = 1; dia <= diasEnMes; dia++) {
+        mapaDia.set(this.diaKey(new Date(anioMes, mes - 1, dia)), 0);
+      }
+      for (const v of ventasDia) {
+        const key = this.diaKey(v.createdAt);
+        if (mapaDia.has(key)) {
+          mapaDia.set(key, this.round(mapaDia.get(key)! + Number(v.total)));
+        }
+      }
+      void empresaId;
+      return Array.from(mapaDia.entries()).map(([mes, total]) => ({
+        mes,
+        total,
+      }));
+    }
+
     let desde: Date;
     let hasta: Date | undefined;
     if (anio) {
@@ -622,6 +665,10 @@ export class DashboardService {
 
   private mesKey(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private diaKey(d: Date): string {
+    return `${this.mesKey(d)}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   private round(n: number): number {

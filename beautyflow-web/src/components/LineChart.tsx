@@ -4,6 +4,13 @@ interface Point { mes: string; total: number; }
 
 const W = 600, H = 200, PAD = 10;
 
+// Etiqueta del punto: "YYYY-MM" (vista de 12 meses) -> "Ene"/"Feb"/...;
+// "YYYY-MM-DD" (vista de un mes específico, desglose diario) -> "1", "2"...
+function etiqueta(key: string): string {
+  const partes = key.split('-');
+  return partes.length === 3 ? String(Number(partes[2])) : mesCorto(key);
+}
+
 function buildPath(data: Point[]) {
   const vals = data.map(d => d.total);
   const max = Math.max(...vals);
@@ -59,7 +66,7 @@ export function LineChart({ data }: { data: Point[] }) {
         padding: '6px 10px 0', fontSize: '10px', color: 'var(--muted)',
         fontFamily: 'var(--font-mono)',
       }}>
-        {data.map(d => <span key={d.mes}>{mesCorto(d.mes)}</span>)}
+        {data.map(d => <span key={d.mes}>{etiqueta(d.mes)}</span>)}
       </div>
     </div>
   );

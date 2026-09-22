@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth';
-import { formatMoney, initiales } from '../../lib/format';
+import { formatMoney, initiales, MESES_CORTOS } from '../../lib/format';
 import { KpiCard } from '../../components/KpiCard';
 import { LineChart } from '../../components/LineChart';
 import { Donut } from '../../components/Donut';
@@ -123,19 +123,23 @@ export function DashboardPage() {
   const sucSelNombre = sucSel ? sucursales!.find(s => s.sucursalId === sucSel)?.nombre : null;
   const sucQS = sucSel ? `?sucursalId=${sucSel}` : '';
 
-  // Selector "Este año / Año pasado" de "Ventas de los últimos 12 meses".
-  // "actual" = comportamiento de siempre (ventana móvil de los últimos 12
-  // meses, sin mandar `anio`); "pasado" = año calendario completo anterior.
+  // Selectores "Este año / Año pasado" + "Mes" de "Ventas de los últimos 12
+  // meses". "actual" = comportamiento de siempre (ventana móvil de los
+  // últimos 12 meses, sin mandar `anio`); "pasado" = año calendario
+  // completo anterior. `mesSel` ('todos' o 1-12) filtra además a un mes
+  // específico de ese año — el gráfico pasa a desglose diario.
   const [anioSel, setAnioSel] = useState<'actual' | 'pasado'>('actual');
+  const [mesSel, setMesSel] = useState<'todos' | number>('todos');
   const anioQS = anioSel === 'pasado' ? `anio=${new Date().getFullYear() - 1}` : '';
-  const graficasQS = [sucSel && `sucursalId=${sucSel}`, anioQS].filter(Boolean).join('&');
+  const mesQS = mesSel !== 'todos' ? `mes=${mesSel}` : '';
+  const graficasQS = [sucSel && `sucursalId=${sucSel}`, anioQS, mesQS].filter(Boolean).join('&');
 
   const { data: kpis, isLoading: kL } = useQuery<Kpis>({
     queryKey: ['dashboard-kpis', sucSel],
     queryFn: () => api.get(`/dashboard/kpis${sucQS}`).then(r => r.data),
   });
   const { data: graficas, isLoading: gL } = useQuery<Graficas>({
-    queryKey: ['dashboard-graficas', sucSel, anioSel],
+    queryKey: ['dashboard-graficas', sucSel, anioSel, mesSel],
     queryFn: () => api.get(`/dashboard/graficas${graficasQS ? `?${graficasQS}` : ''}`).then(r => r.data),
   });
   const { data: rankings, isLoading: rL } = useQuery<Rankings>({
@@ -251,14 +255,26 @@ export function DashboardPage() {
       <div className={styles.row2}>
         <Panel title="Ventas de los últimos 12 meses"
           extra={
-            <select
-              className={styles.sel}
-              value={anioSel}
-              onChange={e => setAnioSel(e.target.value as 'actual' | 'pasado')}
-            >
-              <option value="actual">Este año</option>
-              <option value="pasado">Año pasado</option>
-            </select>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <select
+                className={styles.sel}
+                value={mesSel}
+                onChange={e => setMesSel(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
+              >
+                <option value="todos">Todos los meses</option>
+                {MESES_CORTOS.map((m, i) => (
+                  <option key={m} value={i + 1}>{m}</option>
+                ))}
+              </select>
+              <select
+                className={styles.sel}
+                value={anioSel}
+                onChange={e => setAnioSel(e.target.value as 'actual' | 'pasado')}
+              >
+                <option value="actual">Este año</option>
+                <option value="pasado">Año pasado</option>
+              </select>
+            </div>
           }>
           <LineChart data={graficas?.ventas12Meses ?? []} />
         </Panel>

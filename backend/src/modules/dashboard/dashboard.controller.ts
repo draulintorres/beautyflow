@@ -28,13 +28,17 @@ export class DashboardController {
    * "Ventas de los últimos 12 meses". Sin `anio` → comportamiento de
    * siempre (ventana móvil de los últimos 12 meses). Con `anio` → ese año
    * calendario completo (enero-diciembre).
+   * `mes` (opcional, 1-12): filtro de mes específico de esa misma tarjeta
+   * — cambia el gráfico a un desglose diario de ese mes (del `anio`
+   * elegido, o el actual si no se eligió ninguno).
    */
   @Get('graficas')
   graficas(
     @Query('sucursalId') sucursalId?: string,
     @Query('anio') anio?: string,
+    @Query('mes') mes?: string,
   ) {
-    return this.dashboard.graficas(sucursalId, anio);
+    return this.dashboard.graficas(sucursalId, anio, mes);
   }
 
   @Get('rankings')
