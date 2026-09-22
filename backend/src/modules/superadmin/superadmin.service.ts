@@ -197,12 +197,14 @@ export class SuperAdminService {
         },
       });
 
-      // Método de pago base — sin esto el POS no tenía nada que ofrecer al
+      // Métodos de pago base — sin esto el POS no tenía nada que ofrecer al
       // cobrar (el grid de métodos salía vacío y el botón de confirmar
-      // terminaba mandando la venta como fiao por accidente). Solo
-      // Efectivo: es el único método universal a cualquier negocio;
-      // Tarjeta/Transferencia dependen de cómo cobra cada quien, y los
-      // configura el dueño (pantalla de Ajustes pendiente, ronda aparte).
+      // terminaba mandando la venta como fiao por accidente). Efectivo
+      // ACTIVO (es universal a cualquier negocio); Tarjeta y Transferencia
+      // ya creados pero INACTIVOS — así en Ajustes ("Métodos de Pago") el
+      // dueño solo tiene que activar los que de verdad usa, con un clic,
+      // en vez de escribirlos a mano en el campo de texto libre (que
+      // existe para cualquier OTRO método fuera de estos 3, ej. "Cheque").
       await tx.metodoPago.create({
         data: {
           empresaId: empresa.id,
@@ -210,6 +212,24 @@ export class SuperAdminService {
           esEfectivo: true,
           activo: true,
           orden: 1,
+        },
+      });
+      await tx.metodoPago.create({
+        data: {
+          empresaId: empresa.id,
+          nombre: 'Tarjeta',
+          esEfectivo: false,
+          activo: false,
+          orden: 2,
+        },
+      });
+      await tx.metodoPago.create({
+        data: {
+          empresaId: empresa.id,
+          nombre: 'Transferencia',
+          esEfectivo: false,
+          activo: false,
+          orden: 3,
         },
       });
 
