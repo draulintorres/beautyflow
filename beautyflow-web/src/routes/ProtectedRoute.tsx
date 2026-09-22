@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { api } from '../lib/api';
+import { CambiarPasswordObligatorio } from '../features/auth/CambiarPasswordObligatorio';
 
 export function ProtectedRoute() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -49,5 +50,9 @@ export function ProtectedRoute() {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (hydrating) return null;
+  // Contraseña asignada por otra persona (dueño de empresa nueva, o
+  // empleado con acceso recién creado) — bloquea CUALQUIER módulo hasta
+  // que la cambie, sin importar a qué ruta haya llegado.
+  if (user?.debeChangePassword) return <CambiarPasswordObligatorio />;
   return <Outlet />;
 }

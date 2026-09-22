@@ -14,6 +14,7 @@ import {
   RefreshDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  CambiarPasswordInicialDto,
   LogoutDto,
   WebauthnVerifyRegistrationDto,
   WebauthnLoginOptionsDto,
@@ -63,6 +64,17 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: TenantStore) {
     return this.auth.me(user.usuarioId);
+  }
+
+  /** Cambio obligatorio en el primer login (contraseña asignada por otra
+   * persona) — usuario ya autenticado, sin pedir la contraseña actual. */
+  @Post('cambiar-password-inicial')
+  @HttpCode(HttpStatus.OK)
+  cambiarPasswordInicial(
+    @CurrentUser() user: TenantStore,
+    @Body() dto: CambiarPasswordInicialDto,
+  ) {
+    return this.auth.cambiarPasswordInicial(user.usuarioId, dto.newPassword);
   }
 
   // ---------- WebAuthn: activar en este dispositivo (requiere sesión) ----------

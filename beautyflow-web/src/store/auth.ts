@@ -9,6 +9,10 @@ export interface AuthUser {
   empresaId: string;
   empresaSlug: string;
   modulos?: string[];
+  /** true = la contraseña se la asignó otra persona (dueño de empresa
+   * nueva, o empleado con acceso recién creado) — ProtectedRoute bloquea
+   * el resto de la app hasta que la cambie desde CambiarPasswordObligatorio. */
+  debeChangePassword?: boolean;
 }
 
 export interface AuthEmpresa {

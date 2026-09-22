@@ -27,6 +27,7 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { ModulosEfectivosService } from './modulos-efectivos.service';
 import { MODULOS_GATEABLES, MODULOS_POR_PLAN } from '../../core/auth/permisos.matrix';
+import { EmailService } from '../../core/email/email.service';
 
 /**
  * Servicio del Super Admin. Opera SIN contexto de tenant: usa el cliente
@@ -35,12 +36,17 @@ import { MODULOS_GATEABLES, MODULOS_POR_PLAN } from '../../core/auth/permisos.ma
  */
 @Injectable()
 export class SuperAdminService {
+  private readonly frontendUrl: string;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly modulosEfectivos: ModulosEfectivosService,
-  ) {}
+    private readonly email: EmailService,
+  ) {
+    this.frontendUrl = this.config.getOrThrow('FRONTEND_URL');
+  }
 
   // ============ AUTH ============
   async login(dto: SuperAdminLoginDto) {
@@ -177,7 +183,9 @@ export class SuperAdminService {
       }
       const rolOwner = rolesCreados.find((r) => r.roleKey === RoleKey.OWNER)!;
 
-      // Usuario OWNER
+      // Usuario OWNER — debeChangePassword:true SIEMPRE, la haya escrito
+      // Draulin a mano o se haya generado sola: para el dueño, de cualquier
+      // forma es "una contraseña que le asignaron", no una que él eligió.
       await tx.usuario.create({
         data: {
           empresaId: empresa.id,
@@ -185,6 +193,7 @@ export class SuperAdminService {
           nombre: dto.ownerNombre,
           email: dto.ownerEmail,
           passwordHash,
+          debeChangePassword: true,
         },
       });
 
@@ -238,6 +247,22 @@ export class SuperAdminService {
 
     // Punto de asignación de plan — sincronizar modulos_activos
     await this.sincronizarModulosEmpresa(resultado.id, plan.tipo);
+
+    // Correo de bienvenida — "fire and forget", nunca bloquea ni revierte
+    // la creación de la empresa (EmailService.enviar() ya garantiza no
+    // relanzar el error: mismo criterio que forgotPassword() en
+    // auth.service.ts). No lleva la contraseña — se comunica aparte.
+    const loginUrl = `${this.frontendUrl}/login`;
+    void this.email.enviar(
+      dto.ownerEmail,
+      `Bienvenido a Estixa — ${resultado.nombre}`,
+      `
+        <p>¡Hola${dto.ownerNombre ? ` ${dto.ownerNombre}` : ''}!</p>
+        <p>Tu empresa <b>${resultado.nombre}</b> ya está lista en Estixa.</p>
+        <p>Iniciá sesión con tu correo <b>${dto.ownerEmail}</b> desde <a href="${loginUrl}">${loginUrl}</a>.</p>
+        <p>La primera vez que entres te vamos a pedir crear tu propia contraseña.</p>
+      `,
+    );
 
     return {
       id: resultado.id,

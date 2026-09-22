@@ -48,6 +48,18 @@ export class ResetPasswordDto {
   newPassword: string;
 }
 
+/** Cambio de contraseña obligatorio en el primer login (usuario ya
+ * autenticado con una contraseña que otra persona le asignó) — a
+ * diferencia de ResetPasswordDto, no lleva token: la sesión ya prueba
+ * quién es, y no se pide la contraseña actual porque justamente esa es
+ * la temporal que se está reemplazando. */
+export class CambiarPasswordInicialDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72) // límite de bcrypt
+  newPassword: string;
+}
+
 export class LogoutDto {
   @IsString()
   @IsNotEmpty()

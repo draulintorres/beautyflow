@@ -236,6 +236,11 @@ export class AuthService {
         passwordHash,
         resetToken: null,
         resetTokenExpires: null,
+        // Si por casualidad este era el flujo usado en vez del de cambio
+        // obligatorio (ej. el dueño de una empresa nueva usa "olvidé mi
+        // contraseña" antes de loguearse la primera vez), igual cuenta
+        // como haber cambiado la temporal — se limpia la bandera acá también.
+        debeChangePassword: false,
       },
     });
 
@@ -245,6 +250,25 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
+    return { success: true };
+  }
+
+  // ---------- CAMBIO OBLIGATORIO DE CONTRASEÑA (primer login) ----------
+  /**
+   * Usuario ya autenticado (OWNER de una empresa nueva, o empleado con
+   * acceso recién creado) reemplaza la contraseña temporal que le
+   * asignaron. A diferencia de resetPassword(), no valida ningún token ni
+   * pide la contraseña actual — la sesión ya prueba quién es. No revoca
+   * el resto de sesiones activas a propósito: normalmente no hay
+   * ninguna otra todavía, y revocar la propia rompería el "seguir
+   * navegando sin volver a iniciar sesión" que pide este flujo.
+   */
+  async cambiarPasswordInicial(usuarioId: string, newPassword: string) {
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.usuario.update({
+      where: { id: usuarioId },
+      data: { passwordHash, debeChangePassword: false },
+    });
     return { success: true };
   }
 
@@ -514,7 +538,12 @@ export class AuthService {
   // ---------- HELPERS ----------
   /** Arma la misma respuesta (tokens + user) para login por contraseña y por huella. */
   private async buildAuthResponse(
-    usuario: { id: string; nombre: string; email: string },
+    usuario: {
+      id: string;
+      nombre: string;
+      email: string;
+      debeChangePassword: boolean;
+    },
     rolKey: RoleKey,
     empresaId: string,
     empresaSlug: string,
@@ -534,6 +563,9 @@ export class AuthService {
         modulos: await this.modulosEfectivos.obtenerEfectivosParaRol(empresaId, rolKey),
         empresaId,
         empresaSlug,
+        // El frontend bloquea el acceso al resto de la app (ProtectedRoute)
+        // hasta que el usuario complete /auth/cambiar-password-inicial.
+        debeChangePassword: usuario.debeChangePassword,
       },
     };
   }

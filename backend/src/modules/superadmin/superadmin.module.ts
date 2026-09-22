@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
+import { EmailModule } from '../../core/email/email.module';
 import { SuperAdminService } from './superadmin.service';
 import { SuperAdminBillingService } from './superadmin-billing.service';
 import { LimitsService } from './limits.service';
@@ -14,7 +15,7 @@ import { SuperAdminGuard } from './guards/superadmin.guard';
  */
 @Global()
 @Module({
-  imports: [ConfigModule, JwtModule.register({})],
+  imports: [ConfigModule, JwtModule.register({}), EmailModule],
   controllers: [SuperAdminController],
   providers: [
     SuperAdminService,
