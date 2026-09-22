@@ -1289,29 +1289,29 @@ export class VentasService {
     return (last?.numero ?? 0) + 1;
   }
 
+  /**
+   * Resuelve el `Empleado` al que se le atribuye la venta que se está
+   * cobrando. SIEMPRE el propio del usuario que cobra — nunca "cualquier
+   * empleado activo de la empresa": ese fallback existió antes (2026-09-21)
+   * y atribuía la venta a otra persona al azar cuando el usuario logueado
+   * no tenía su ficha de Empleado vinculada, dejando comisiones mal
+   * asignadas a alguien que no hizo esa venta. Quitado (2026-09-22).
+   */
   private async resolveEmpleadoRegistra(usuarioId: string) {
     const empleado = await this.prisma.db.empleado.findFirst({
       where: { usuarioId },
       select: { id: true, sucursalId: true },
     });
     if (empleado) return empleado;
-    // Fallback: primer empleado activo de la empresa
-    const any = await this.prisma.db.empleado.findFirst({
-      where: { activo: true },
-      select: { id: true, sucursalId: true },
-    });
-    if (any) return any;
 
-    // Empresa nueva sin ningún empleado registrado todavía: el OWNER debe
-    // poder cobrar desde el primer día sin depender de haber cargado
-    // cajeros/recepcionistas antes. `Venta.empleadoId` es una FK real a
-    // `Empleado` (no puede apuntar a `Usuario` directo), así que se le crea
-    // acá, una sola vez, un `Empleado` propio ligado a su usuario — el
-    // `findFirst` de arriba lo va a encontrar y reusar en cobros futuros.
-    // Solo para OWNER: cualquier otro rol sin empleado propio ni empleados
-    // activos en la empresa sigue viendo el error de siempre (caso ya
-    // cubierto hoy por el flujo normal de Equipo, que crea el Empleado
-    // antes que el Usuario).
+    // Sin Empleado propio: el OWNER puede cobrar desde el primer día sin
+    // depender de haber cargado cajeros/recepcionistas antes —
+    // `Venta.empleadoId` es una FK real a `Empleado` (no puede apuntar a
+    // `Usuario` directo), así que se le crea acá, una sola vez, un
+    // `Empleado` propio ligado a su usuario (el `findFirst` de arriba lo
+    // va a encontrar y reusar en cobros futuros), marcado
+    // `esCuentaDueno: true` para que `LimitsService` lo excluya del
+    // límite de empleados del plan — no es personal contratado.
     const user = getCurrentUser();
     if (user.rol === RoleKey.OWNER) {
       const usuario = await this.prisma.usuario.findUnique({
@@ -1323,13 +1323,17 @@ export class VentasService {
           usuarioId,
           nombre: usuario?.nombre ?? 'Dueño',
           activo: true,
+          esCuentaDueno: true,
         } as any,
         select: { id: true, sucursalId: true },
       });
     }
 
+    // Cualquier otro rol (cajero, recepción, etc.) sin Empleado vinculado:
+    // mejor bloquear con un error explícito que adivinar y atribuirle la
+    // venta a otra persona.
     throw new BadRequestException(
-      'No hay empleados registrados para asociar la venta',
+      'Su usuario no tiene un empleado vinculado. Pida que lo vinculen desde Equipo antes de poder cobrar.',
     );
   }
 

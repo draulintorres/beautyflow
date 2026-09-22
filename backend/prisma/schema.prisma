@@ -742,6 +742,11 @@ model Empleado {
   participaAgenda Boolean    @default(true)  @map("participa_agenda")
   modeloPago      ModeloPago @default(COMISION) @map("modelo_pago")
   sueldoMonto     Decimal?   @map("sueldo_monto") @db.Decimal(12, 2)
+  // true SOLO para el Empleado que `ventas.service.ts` auto-crea para el
+  // OWNER cuando cobra sin tener ninguno propio (para que la FK de Venta
+  // tenga a quién apuntar) — no es personal contratado, así que no debe
+  // "gastar" un cupo del límite de empleados del plan (ver LimitsService).
+  esCuentaDueno   Boolean    @default(false) @map("es_cuenta_dueno")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")

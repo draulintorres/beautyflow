@@ -54,7 +54,11 @@ export class LimitsService {
       });
     }
     return this.prisma.empleado.count({
-      where: { empresaId, deletedAt: null },
+      // esCuentaDueno=true no es personal contratado (ni inquilino de
+      // Alquiler de Silla) — es solo la fila técnica que `ventas.service.ts`
+      // le crea al OWNER para poder cobrar sin depender de tener staff
+      // cargado. No debe "gastar" cupo del límite del plan.
+      where: { empresaId, deletedAt: null, esCuentaDueno: false },
     });
   }
 }
