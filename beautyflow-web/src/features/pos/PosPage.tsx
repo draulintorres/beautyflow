@@ -14,6 +14,7 @@ interface Cliente { id: string; nombre: string; telefono: string; etiquetas: str
 interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean;
   modeloPago?: 'COMISION' | 'SUELDO_FIJO' | 'ALQUILER';
+  esCuentaDueno?: boolean;
   usuario?: { id: string } | null;
 }
 interface MetodoPago { id: string; nombre: string; esEfectivo: boolean; activo: boolean; orden: number; }
@@ -90,8 +91,12 @@ export function PosPage() {
   const { data: cajaEstado } = useCajaEstado();
 
   const cliente = clientes.find(c => c.id === clienteId) ?? null;
+  // esCuentaDueno excluido: es el Empleado fantasma que se autocrea para el
+  // dueño (resolveEmpleadoRegistra), no personal contratado — no tiene
+  // sentido ofrecerlo como opción de "quién lo hizo" ni exigir el aviso de
+  // "sin comisión" cuando es la única persona cobrando.
   const empleadosServicio = empleados
-    .filter(e => e.activo && e.participaAgenda)
+    .filter(e => e.activo && e.participaAgenda && !e.esCuentaDueno)
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   const metodoSel = metodos.find(m => m.id === metodoId) ?? null;
 
@@ -503,8 +508,11 @@ export function PosPage() {
             className={styles.confirmBtn}
             disabled={!puedeConfirmar}
             onClick={() => {
+              // Sin empleados reales que ofrecer (solo el dueño, o nadie
+              // todavía), no hay a quién "olvidar" seleccionar — se cobra
+              // directo, sin el aviso.
               const sinEmp = lineas.filter(l => l.tipo === 'SERVICIO' && !l.empleadoId).map(l => l.nombre);
-              if (sinEmp.length > 0) { setWarnSinEmpleado(sinEmp); return; }
+              if (sinEmp.length > 0 && empleadosServicio.length > 0) { setWarnSinEmpleado(sinEmp); return; }
               crearVenta.mutate();
             }}
           >

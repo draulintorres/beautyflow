@@ -14,7 +14,7 @@ interface Cliente {
   permiteFiao?: boolean; limiteCredito?: number; balancePendiente?: number;
   etiquetas?: string[];
 }
-interface Empleado { id: string; nombre: string; activo: boolean; participaAgenda: boolean; }
+interface Empleado { id: string; nombre: string; activo: boolean; participaAgenda: boolean; esCuentaDueno?: boolean; }
 interface MetodoPago { id: string; nombre: string; esEfectivo: boolean; activo: boolean; orden: number; }
 
 interface Linea {
@@ -78,8 +78,12 @@ export function PosMobile() {
   const { data: cajaEstado } = useCajaEstado();
   const qc = useQueryClient();
 
+  // esCuentaDueno excluido: es el Empleado fantasma que se autocrea para el
+  // dueño (resolveEmpleadoRegistra), no personal contratado — no tiene
+  // sentido ofrecerlo como opción de "quién lo hizo" ni exigir el aviso de
+  // "sin comisión" cuando es la única persona cobrando.
   const empleadosServicio = empleados
-    .filter(e => e.activo && e.participaAgenda)
+    .filter(e => e.activo && e.participaAgenda && !e.esCuentaDueno)
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
   const clienteSel = clientes.find(c => c.id === clienteId);
@@ -301,7 +305,7 @@ export function PosMobile() {
               className={styles.cobrarBtn}
               onClick={() => {
                 const hay = lineas.some(l => l.tipo === 'SERVICIO' && !l.empleadoId);
-                if (hay) { setWarnSinEmp(true); return; }
+                if (hay && empleadosServicio.length > 0) { setWarnSinEmp(true); return; }
                 setCarritoOpen(false); setPagoOpen(true);
               }}
             >
