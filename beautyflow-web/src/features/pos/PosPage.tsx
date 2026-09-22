@@ -222,7 +222,17 @@ export function PosPage() {
     },
   });
 
-  const puedeConfirmar = lineas.length > 0 && !crearVenta.isPending;
+  // `metodoId || creditoSel`: exige que la persona haya elegido de verdad
+  // un método de pago o marcado Crédito — no solo que existan opciones.
+  // Sin esto, con métodos.length===0 (empresa nueva sin métodos de pago
+  // configurados) el grid de abajo no tenía nada que mostrar, el botón
+  // seguía habilitado solo con que hubiera líneas en el carrito, y al
+  // confirmar el mutationFn de arriba caía al `else` (`permitirFiao: true`)
+  // como si se hubiera pedido vender a crédito — cosa que nadie eligió. El
+  // backend entonces respondía "El fiao requiere un cliente registrado",
+  // un error sin relación con la causa real. Esta condición además cubre
+  // el caso con métodos configurados pero ninguno clickeado todavía.
+  const puedeConfirmar = lineas.length > 0 && !crearVenta.isPending && (!!metodoId || creditoSel);
 
   // Anular venta (Parte A): solo OWNER/ADMIN, motivo obligatorio.
   const puedeAnular = authUser?.rol === 'OWNER' || authUser?.rol === 'ADMIN';
@@ -452,6 +462,11 @@ export function PosPage() {
               </button>
             )}
           </div>
+          {metodos.filter(m => m.activo).length === 0 && !cliente?.permiteFiao && (
+            <p className={styles.errMsg}>
+              No hay métodos de pago configurados. Contacta a soporte para configurarlos.
+            </p>
+          )}
 
           <div className={styles.payTotals}>
             <div className={`${styles.prow} ${styles.prowTotal}`}>

@@ -622,6 +622,11 @@ function PagoSheet({ total, metodos, clientePermiteFiao, creditoDisponible, onCl
                 </button>
               ))}
             </div>
+            {metodos.length === 0 && !clientePermiteFiao && (
+              <div className={styles.fiaoWarn}>
+                No hay métodos de pago configurados. Contacta a soporte para configurarlos.
+              </div>
+            )}
             <label className={styles.montoLbl}>
               Monto
               <input type="number" value={monto || ''} onChange={e => setMonto(Number(e.target.value))} />

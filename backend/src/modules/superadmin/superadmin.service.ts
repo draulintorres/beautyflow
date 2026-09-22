@@ -197,6 +197,22 @@ export class SuperAdminService {
         },
       });
 
+      // Método de pago base — sin esto el POS no tenía nada que ofrecer al
+      // cobrar (el grid de métodos salía vacío y el botón de confirmar
+      // terminaba mandando la venta como fiao por accidente). Solo
+      // Efectivo: es el único método universal a cualquier negocio;
+      // Tarjeta/Transferencia dependen de cómo cobra cada quien, y los
+      // configura el dueño (pantalla de Ajustes pendiente, ronda aparte).
+      await tx.metodoPago.create({
+        data: {
+          empresaId: empresa.id,
+          nombre: 'Efectivo',
+          esEfectivo: true,
+          activo: true,
+          orden: 1,
+        },
+      });
+
       return empresa;
     });
 
