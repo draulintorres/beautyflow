@@ -250,16 +250,21 @@ export class SuperAdminService {
     // Punto de asignación de plan — sincronizar modulos_activos
     await this.sincronizarModulosEmpresa(resultado.id, plan.tipo);
 
-    // Correo de bienvenida — "fire and forget", nunca bloquea ni revierte
-    // la creación de la empresa (EmailService.enviar() ya garantiza no
-    // relanzar el error: mismo criterio que forgotPassword() en
-    // auth.service.ts). No lleva la contraseña — se comunica aparte.
+    // Correo de bienvenida — SÍ se espera (a diferencia del patrón
+    // "fire and forget" de forgotPassword(), que no puede esperar porque
+    // ahí el timing de la respuesta no debe filtrar si la cuenta existe).
+    // Acá no hay ese problema, y sin esperarlo, un redeploy de Render que
+    // mata el proceso justo después de responder puede cortar el envío a
+    // medio hacer -- la empresa queda creada pero el correo nunca sale
+    // (pasó exactamente así probando esta ronda). EmailService.enviar()
+    // sigue garantizando no relanzar el error, así que esperarlo no puede
+    // hacer fallar ni revertir la creación de la empresa.
     const loginUrl = `${this.frontendUrl}/login`;
     // Sin guiones en el correo: el login ya tolera que se escriba el slug
     // sin ellos (resolverEmpresaPorSlug), y así es más simple de teclear
     // que copiar los guiones exactos.
     const slugSinGuiones = resultado.slug.replace(/-/g, '');
-    void this.email.enviar(
+    await this.email.enviar(
       dto.ownerEmail,
       `Bienvenido a Estixa — ${resultado.nombre}`,
       `
