@@ -8,10 +8,11 @@ import styles from './NuevaCitaMobile.module.css';
 
 interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean;
+  esCuentaDueno?: boolean;
   usuario?: { id: string } | null;
 }
 interface Servicio { id: string; nombre: string; precio: string; duracionMin: number; categoria?: { nombre: string }; activo: boolean; }
-interface Cliente { id: string; nombre: string; telefono?: string; }
+interface Cliente { id: string; nombre: string; telefono?: string; whatsapp?: string; }
 interface Intervalo { inicio: string; fin: string; }
 interface Disponibilidad {
   fecha: string; trabaja: boolean;
@@ -116,7 +117,12 @@ export function NuevaCitaMobile({
     }
   }, [soyInquilino, miEmpleado, empleadoId]);
 
-  const empleadosActivos   = empleados.filter(e => e.activo && e.participaAgenda !== false);
+  // esCuentaDueno excluido: es el Empleado fantasma que se autocrea para el
+  // dueño (resolveEmpleadoRegistra, en el POS) — nunca tiene horario
+  // configurado, así que ofrecerlo acá terminaba siempre en "no trabaja
+  // ese día" sin importar la fecha. Mismo criterio ya usado en el POS
+  // (empleadosServicio) y en el Dashboard (topEmpleados).
+  const empleadosActivos   = empleados.filter(e => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
   const serviciosFiltrados = servicios.filter(s =>
     s.activo && s.nombre.toLowerCase().includes(busServ.toLowerCase())
   );
@@ -391,7 +397,7 @@ export function NuevaCitaMobile({
                   >
                     <div className={styles.cliTexts}>
                       <span className={styles.cliNom}>{c.nombre}</span>
-                      {c.telefono && <span className={styles.cliTel}>{c.telefono}</span>}
+                      {(c.whatsapp || c.telefono) && <span className={styles.cliTel}>{c.whatsapp || c.telefono}</span>}
                     </div>
                     {clienteId === c.id && (
                       <svg className={styles.checkIco} viewBox="0 0 24 24">

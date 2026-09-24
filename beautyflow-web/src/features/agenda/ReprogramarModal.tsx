@@ -22,6 +22,7 @@ export interface EmpleadoParaAccion {
   nombre: string;
   activo: boolean;
   participaAgenda: boolean;
+  esCuentaDueno?: boolean;
 }
 
 /**
@@ -73,7 +74,8 @@ export function ReprogramarModal({
   const [empleadoId, setEmpleadoId] = useState(cita.empleado?.id ?? '');
   const [err, setErr] = useState('');
 
-  const empleadosActivos = empleados.filter((e) => e.activo && e.participaAgenda !== false);
+  // esCuentaDueno excluido: mismo criterio que NuevaCitaMobile.tsx.
+  const empleadosActivos = empleados.filter((e) => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
 
   const reprogramar = useMutation({
     mutationFn: () => api.patch(`/citas/${cita.id}/reprogramar`, {

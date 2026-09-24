@@ -314,7 +314,6 @@ function ClienteModal({ cliente, onClose, onSaved }: {
   const [form, setForm] = useState({
     nombre:          cliente?.nombre          ?? '',
     apellido:        cliente?.apellido        ?? '',
-    telefono:        cliente?.telefono        ?? '',
     whatsapp:        cliente?.whatsapp        ?? '',
     email:           cliente?.email           ?? '',
     cedula:          cliente?.cedula          ?? '',
@@ -360,7 +359,6 @@ function ClienteModal({ cliente, onClose, onSaved }: {
           <div className={styles.formGrid}>
             <L label="Nombre *"><input value={form.nombre} onChange={e => set('nombre', e.target.value)} /></L>
             <L label="Apellido"><input value={form.apellido} onChange={e => set('apellido', e.target.value)} /></L>
-            <L label="Teléfono"><input value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="809-000-0000" /></L>
             <L label="WhatsApp"><input value={form.whatsapp} onChange={e => set('whatsapp', e.target.value)} placeholder="809-000-0000" /></L>
             <L label="Correo"><input value={form.email} onChange={e => set('email', e.target.value)} type="email" /></L>
             <L label="Cédula"><input value={form.cedula} onChange={e => set('cedula', e.target.value)} /></L>

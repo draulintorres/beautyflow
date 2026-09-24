@@ -377,7 +377,7 @@ export class ReportesDataService {
         estado: { in: [VentaStatus.PENDIENTE, VentaStatus.ABONO_PARCIAL] },
         ...(sucursalId && { sucursalId }),
       },
-      include: { cliente: { select: { nombre: true, telefono: true } } },
+      include: { cliente: { select: { nombre: true, telefono: true, whatsapp: true } } },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -385,7 +385,7 @@ export class ReportesDataService {
       factura: `F${String(v.numero).padStart(7, '0')}`,
       fecha: v.createdAt.toISOString().slice(0, 10),
       cliente: v.cliente?.nombre ?? 'N/D',
-      telefono: v.cliente?.telefono ?? '',
+      telefono: v.cliente?.whatsapp ?? v.cliente?.telefono ?? '',
       total: Number(v.total),
       saldo: Number(v.saldo),
     }));

@@ -526,7 +526,7 @@ export class AgendaService {
 
   private fullInclude(): Prisma.CitaInclude {
     return {
-      cliente: { select: { id: true, nombre: true, telefono: true } },
+      cliente: { select: { id: true, nombre: true, telefono: true, whatsapp: true } },
       empleado: { select: { id: true, nombre: true } },
       cabina: { select: { id: true, nombre: true } },
       servicios: {

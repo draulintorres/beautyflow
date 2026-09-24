@@ -711,7 +711,7 @@ export class VentasService {
     const venta = await this.prisma.db.venta.findFirst({
       where: { id },
       include: {
-        cliente: { select: { id: true, nombre: true, telefono: true } },
+        cliente: { select: { id: true, nombre: true, telefono: true, whatsapp: true } },
         detalles: { include: { empleado: { select: { nombre: true } } } },
         pagos: {
           include: { metodoPago: { select: { nombre: true } } },
@@ -774,7 +774,7 @@ export class VentasService {
     const ventas = await this.prisma.db.venta.findMany({
       where,
       include: {
-        cliente: { select: { nombre: true, telefono: true } },
+        cliente: { select: { nombre: true, telefono: true, whatsapp: true } },
         detalles: {
           select: { tipo: true, empleado: { select: { nombre: true } } },
         },
@@ -789,7 +789,7 @@ export class VentasService {
         id: v.id,
         factura: `F${String(v.numero).padStart(7, '0')}`,
         cliente: v.cliente?.nombre ?? 'Walk-in',
-        clienteTelefono: v.cliente?.telefono ?? null,
+        clienteTelefono: v.cliente?.whatsapp ?? v.cliente?.telefono ?? null,
         profesional: primerServicio?.empleado?.nombre ?? null,
         total: Number(v.total),
         saldo: Number(v.saldo),
@@ -1386,7 +1386,11 @@ export class VentasService {
       motivoAnulacion: v.motivoAnulacion ?? null,
       anuladaAt: v.anuladaAt ?? null,
       cliente: v.cliente
-        ? { id: v.cliente.id, nombre: v.cliente.nombre, telefono: v.cliente.telefono }
+        ? {
+            id: v.cliente.id,
+            nombre: v.cliente.nombre,
+            telefono: v.cliente.whatsapp ?? v.cliente.telefono,
+          }
         : null,
       lineas: v.detalles.map((d: any) => ({
         tipo: d.tipo,

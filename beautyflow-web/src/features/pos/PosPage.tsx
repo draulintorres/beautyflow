@@ -10,7 +10,7 @@ import { PosMobile } from './PosMobile';
 
 interface Servicio { id: string; nombre: string; precio: string; duracionMin: number; categoria?: { nombre: string }; activo: boolean; }
 interface Producto { id: string; nombre: string; precio: string; activo: boolean; }
-interface Cliente { id: string; nombre: string; telefono: string; etiquetas: string[]; permiteFiao: boolean; limiteCredito: number; balancePendiente: number; }
+interface Cliente { id: string; nombre: string; telefono: string; whatsapp: string; etiquetas: string[]; permiteFiao: boolean; limiteCredito: number; balancePendiente: number; }
 interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean;
   modeloPago?: 'COMISION' | 'SUELDO_FIJO' | 'ALQUILER';
@@ -212,7 +212,7 @@ export function PosPage() {
         factura: fac.factura,
         total: fac.total,
         clienteNombre: cliente?.nombre || null,
-        clienteTel: cliente?.telefono || null,
+        clienteTel: cliente?.whatsapp || cliente?.telefono || null,
       });
       limpiarVenta();
       qc.invalidateQueries({ queryKey: ['facturas'] });
@@ -361,7 +361,7 @@ export function PosPage() {
           <div className={styles.clienteBox}>
             <select className={styles.clienteSelect} value={clienteId ?? ''} onChange={e => setClienteId(e.target.value || null)}>
               <option value="">Cliente anónimo (walk-in)</option>
-              {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} · {c.telefono}</option>)}
+              {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} · {c.whatsapp || c.telefono}</option>)}
             </select>
             {cliente && (
               <div className={styles.clienteMeta}>

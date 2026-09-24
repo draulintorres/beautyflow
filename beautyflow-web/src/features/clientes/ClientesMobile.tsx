@@ -329,7 +329,6 @@ function ClienteForm({
   const [f, setF] = useState({
     nombre:          cliente?.nombre                        ?? '',
     apellido:        cliente?.apellido                      ?? '',
-    telefono:        fmtTel(cliente?.telefono               ?? ''),
     whatsapp:        fmtTel(cliente?.whatsapp               ?? ''),
     email:           cliente?.email                         ?? '',
     fechaNacimiento: isoToDisplay(cliente?.fechaNacimiento),
@@ -350,7 +349,6 @@ function ClienteForm({
       const body: any = { nombre: f.nombre };
       (['apellido','email','sexo','cedula','direccion','alergias','notas'] as const)
         .forEach(k => { if ((f[k] as string)?.trim()) body[k] = (f[k] as string).trim(); });
-      if (f.telefono.trim()) body.telefono = f.telefono.trim();
       if (f.whatsapp.trim()) body.whatsapp = f.whatsapp.trim();
       if (f.fechaNacimiento.trim()) {
         const iso = displayToISO(f.fechaNacimiento);
@@ -361,13 +359,7 @@ function ClienteForm({
         : api.post('/clientes', body);
     },
     onSuccess: () => onSaved(),
-    onError: (e: any) => {
-      setErr(
-        e?.response?.status === 409
-          ? 'Ese teléfono ya está registrado en otro cliente.'
-          : 'No se pudo guardar el cliente.'
-      );
-    },
+    onError: () => setErr('No se pudo guardar el cliente.'),
   });
 
   return (
@@ -384,7 +376,6 @@ function ClienteForm({
         <div className={styles.form}>
           <In label="Nombre *"            v={f.nombre}          on={v => set('nombre', v)} />
           <In label="Apellido"            v={f.apellido}        on={v => set('apellido', v)} />
-          <In label="Teléfono"            v={f.telefono}        on={v => set('telefono', fmtTel(v))}   placeholder="XXX-XXX-XXXX" inputMode="tel" />
           <In label="WhatsApp"            v={f.whatsapp}        on={v => set('whatsapp', fmtTel(v))}   placeholder="XXX-XXX-XXXX" inputMode="tel" />
           <In label="Correo"              v={f.email}           on={v => set('email', v)}               type="email" />
           <In label="Fecha de nacimiento" v={f.fechaNacimiento} on={v => set('fechaNacimiento', fmtFecha(v))} placeholder="dd/mm/aaaa" inputMode="numeric" />

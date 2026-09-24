@@ -41,7 +41,7 @@ export class FacturaReciboService {
       this.prisma.db.venta.findFirst({
         where: { id: ventaId },
         include: {
-          cliente: { select: { id: true, nombre: true, telefono: true } },
+          cliente: { select: { id: true, nombre: true, telefono: true, whatsapp: true } },
           detalles: { include: { empleado: { select: { nombre: true } } } },
           pagos: {
             include: { metodoPago: { select: { nombre: true } } },
@@ -64,7 +64,7 @@ export class FacturaReciboService {
       this.prisma.db.venta.findFirst({
         where: { id: ventaId },
         include: {
-          cliente: { select: { id: true, nombre: true, telefono: true } },
+          cliente: { select: { id: true, nombre: true, telefono: true, whatsapp: true } },
           pagos: {
             where: { id: pagoId },
             include: { metodoPago: { select: { nombre: true } } },
@@ -123,9 +123,10 @@ export class FacturaReciboService {
       const clienteNombre = venta.cliente?.nombre ?? 'Walk-in';
       doc.fontSize(8).fillColor(C_TEXT).font('Helvetica')
         .text(`Cliente: ${clienteNombre}`, M, y, { lineBreak: false });
-      if (venta.cliente?.telefono) {
+      const clienteTel = venta.cliente?.whatsapp ?? venta.cliente?.telefono;
+      if (clienteTel) {
         doc.fontSize(8).fillColor(C_TEXT).font('Helvetica')
-          .text(`Tel: ${venta.cliente.telefono}`, M, y, { width: CW, align: 'right', lineBreak: false });
+          .text(`Tel: ${clienteTel}`, M, y, { width: CW, align: 'right', lineBreak: false });
       }
       y += 13;
 

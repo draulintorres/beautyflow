@@ -10,7 +10,7 @@ import { NuevaCitaMobile } from './NuevaCitaMobile';
 
 interface Cita {
   id: string; fecha: string; horaInicio: string; horaFin: string; estado: string;
-  cliente?: { id: string; nombre: string; telefono?: string };
+  cliente?: { id: string; nombre: string; telefono?: string; whatsapp?: string };
   empleado?: { id: string; nombre: string };
   servicios: { servicioId: string; nombre: string; precio: number }[];
   total: number; notas?: string | null;
@@ -18,7 +18,7 @@ interface Cita {
   // ACTIVA ligada.
   venta?: { id: string; estado: string } | null;
 }
-interface Empleado { id: string; nombre: string; activo: boolean; participaAgenda: boolean; }
+interface Empleado { id: string; nombre: string; activo: boolean; participaAgenda: boolean; esCuentaDueno?: boolean; }
 
 type Filtro = 'TODAS' | 'CONFIRMADA' | 'PENDIENTE' | 'EN_PROCESO' | 'CANCELADA';
 
@@ -304,10 +304,10 @@ export function AgendaMobile() {
                   Cobrar
                 </button>
               )}
-              {sel.cliente?.telefono && (
+              {(sel.cliente?.whatsapp || sel.cliente?.telefono) && (
                 <a
                   className={styles.actWa}
-                  href={`https://wa.me/1${sel.cliente.telefono.replace(/\D/g, '')}`}
+                  href={`https://wa.me/1${(sel.cliente.whatsapp || sel.cliente.telefono)!.replace(/\D/g, '')}`}
                   target="_blank"
                   rel="noreferrer"
                 >

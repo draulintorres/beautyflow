@@ -12,7 +12,7 @@ import styles from './AgendaPage.module.css';
 interface Cita {
   id: string; fecha: string; horaInicio: string; horaFin: string;
   estado: string;
-  cliente: { id: string; nombre: string; telefono: string } | null;
+  cliente: { id: string; nombre: string; telefono: string; whatsapp: string } | null;
   empleado: { id: string; nombre: string } | null;
   servicios: { servicioId: string; nombre: string; precio: number; duracionMin: number }[];
   subtotal: number; descuento: number; itbis: number; total: number;
@@ -23,6 +23,7 @@ interface Cita {
 }
 interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean;
+  esCuentaDueno?: boolean;
   usuario?: { id: string } | null;
 }
 interface DeudaAlquiler { id: string; saldo: number; estado: string; }
@@ -211,7 +212,9 @@ export function AgendaPage() {
   const nowLabel = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
   const empList = useMemo(() => {
-    let base = empleados.filter(e => e.activo && e.participaAgenda !== false);
+    // esCuentaDueno excluido: no es personal bookable (ver mismo criterio
+    // en NuevaCitaMobile.tsx) -- no tiene sentido como columna del calendario.
+    let base = empleados.filter(e => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
     // Alquiler de silla: cortesía visual — el inquilino solo ve su propia
     // columna (el backend ya filtra las citas; esto evita listar nombres
     // de otros empleados en el calendario de alguien que es un negocio
@@ -400,7 +403,7 @@ export function AgendaPage() {
                       <svg viewBox="0 0 24 24" fill="none" stroke="#9a988f" strokeWidth="2" width="13" height="13">
                         <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.69 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.33 1.85.56 2.81.69A2 2 0 0122 16.92z"/>
                       </svg>
-                      {selCita.cliente.telefono}
+                      {selCita.cliente.whatsapp || selCita.cliente.telefono}
                     </div>
                   </div>
                 </div>
@@ -458,8 +461,8 @@ export function AgendaPage() {
                       Cobrar
                     </button>
                   )}
-                  {selCita.cliente?.telefono && (
-                    <a href={`https://wa.me/1${selCita.cliente.telefono.replace(/\D/g,'')}`}
+                  {(selCita.cliente?.whatsapp || selCita.cliente?.telefono) && (
+                    <a href={`https://wa.me/1${(selCita.cliente.whatsapp || selCita.cliente.telefono).replace(/\D/g,'')}`}
                       target="_blank" rel="noopener noreferrer"
                       className={`${styles.dbtn} ${styles.dWa}`}>
                       <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-8.5 8.5 8.5 8.5 0 01-4-1L3 21l1.5-5a8.5 8.5 0 01-1-4 8.38 8.38 0 018.5-8.5 8.5 8.5 0 018 8.5z"/></svg>
