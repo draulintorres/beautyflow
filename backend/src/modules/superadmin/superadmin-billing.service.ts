@@ -31,7 +31,20 @@ export class SuperAdminBillingService {
   // ============ FACTURAS ============
   async listarFacturas(filtro?: { status?: FacturaSaaSStatus }) {
     return this.prisma.facturaSaaS.findMany({
-      where: { ...(filtro?.status && { status: filtro.status }) },
+      where: {
+        ...(filtro?.status && { status: filtro.status }),
+        // Una factura PAGADA de una empresa que después se eliminó sigue
+        // siendo historial real de cobro -- se muestra igual. Pero
+        // PENDIENTE/VENCIDA/ANULADA de una empresa ya eliminada no es
+        // nada cobrable (nunca lo será) y solo ensucia "Pendiente de
+        // cobro": eliminarEmpresa() nunca cancela la Subscription, así
+        // que sin este filtro esas facturas fantasma se acumulan para
+        // siempre (confirmado: ~20 empresas de prueba inflando el total).
+        OR: [
+          { subscription: { empresa: { deletedAt: null } } },
+          { status: FacturaSaaSStatus.PAGADA },
+        ],
+      },
       include: {
         subscription: {
           include: { empresa: { select: { nombre: true, slug: true } } },
@@ -55,6 +68,9 @@ export class SuperAdminBillingService {
       include: { subscription: { include: { empresa: true } } },
     });
     if (!factura) throw new NotFoundException('Factura no encontrada');
+    if (factura.subscription.empresa.deletedAt) {
+      throw new ConflictException('La empresa de esta factura ya fue eliminada.');
+    }
     if (factura.status === FacturaSaaSStatus.PAGADA || factura.status === FacturaSaaSStatus.ANULADA) {
       throw new ConflictException('Esta factura ya no tiene un pago pendiente.');
     }
@@ -149,8 +165,16 @@ export class SuperAdminBillingService {
 
   /** Genera la factura del período actual para cada suscripción activa. */
   async generarFacturasDelMes() {
+    // `empresa.deletedAt: null` es necesario a propósito: eliminarEmpresa()
+    // (soft-delete) nunca cancela la Subscription asociada, así que sin
+    // este filtro esto le seguía generando una factura PENDIENTE cada mes,
+    // para siempre, a cualquier empresa ya borrada -- confirmado en vivo:
+    // generó facturas reales para ~20 empresas de prueba ya eliminadas.
     const subs = await this.prisma.subscription.findMany({
-      where: { status: { in: [SubStatus.ACTIVE, SubStatus.PAST_DUE] } },
+      where: {
+        status: { in: [SubStatus.ACTIVE, SubStatus.PAST_DUE] },
+        empresa: { deletedAt: null },
+      },
       include: { planRef: true },
     });
 
@@ -189,10 +213,15 @@ export class SuperAdminBillingService {
   async suspenderMorosas() {
     const hoy = new Date();
 
+    // Mismo filtro que generarFacturasDelMes(): sin él, esto le pisaba el
+    // estado CANCELED a una empresa ya eliminada, devolviéndola a
+    // SUSPENDED -- un dato incorrecto sobre algo que ya no debería
+    // tocarse en absoluto.
     const vencidas = await this.prisma.facturaSaaS.findMany({
       where: {
         status: FacturaSaaSStatus.PENDIENTE,
         fechaVencimiento: { lt: hoy },
+        subscription: { empresa: { deletedAt: null } },
       },
       include: { subscription: true },
     });
