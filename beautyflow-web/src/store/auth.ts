@@ -127,14 +127,20 @@ export const useAuthStore = create<AuthState>()(
         set({ accessToken, refreshToken }),
 
       logout: () => {
+        // El removeItem tiene que ser lo ÚLTIMO: el `set(...)` de abajo
+        // dispara el middleware `persist`, que vuelve a escribir la clave
+        // (con los campos ya en null, nunca datos reales — no es una fuga)
+        // apenas cambia el estado. Si el removeItem corriera antes, esa
+        // escritura del persist la resucitaba un instante después, y la
+        // clave nunca quedaba realmente ausente tras cerrar sesión.
+        writeTarget = 'session';
+        set({ accessToken: null, refreshToken: null, user: null, empresa: null, isAuthenticated: false });
         try {
           localStorage.removeItem(STORAGE_KEY);
           sessionStorage.removeItem(STORAGE_KEY);
         } catch {
           /* noop */
         }
-        writeTarget = 'session';
-        set({ accessToken: null, refreshToken: null, user: null, empresa: null, isAuthenticated: false });
       },
     }),
     {
