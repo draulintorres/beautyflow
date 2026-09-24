@@ -35,7 +35,12 @@ export class DisponibilidadService {
   ): Promise<DisponibilidadResult> {
     const empleado = await this.prisma.db.empleado.findFirst({
       where: { id: empleadoId },
-      select: { id: true, enVacaciones: true, participaAgenda: true },
+      select: {
+        id: true,
+        enVacaciones: true,
+        participaAgenda: true,
+        esCuentaDueno: true,
+      },
     });
     if (!empleado) throw new NotFoundException('Empleado no encontrado');
 
@@ -46,7 +51,19 @@ export class DisponibilidadService {
       where: { empleadoId, diaSemana, activo: true },
     });
 
-    if (!horario || empleado.enVacaciones || !empleado.participaAgenda) {
+    // El dueño (esCuentaDueno) no tiene por qué configurar un horario
+    // formal solo para poder agendarse citas a sí mismo — se asume
+    // disponible todo el día si no configuró uno (igual puede configurarlo
+    // desde Equipo, como cualquier empleado, para acotarlo). Sus citas y
+    // bloqueos reales de ese día SÍ se siguen respetando más abajo, así
+    // que esto no permite que se doble-agende.
+    const duenoSinHorario = !horario && empleado.esCuentaDueno;
+
+    if (
+      (!horario && !duenoSinHorario) ||
+      empleado.enVacaciones ||
+      !empleado.participaAgenda
+    ) {
       return {
         fecha,
         trabaja: false,
@@ -57,8 +74,8 @@ export class DisponibilidadService {
       };
     }
 
-    const jornadaIni = this.toMin(horario.horaInicio);
-    const jornadaFin = this.toMin(horario.horaFin);
+    const jornadaIni = duenoSinHorario ? 0 : this.toMin(horario!.horaInicio);
+    const jornadaFin = duenoSinHorario ? 23 * 60 + 59 : this.toMin(horario!.horaFin);
 
     // 2. Rango del día en timestamps para consultar citas y bloqueos
     const dayStart = new Date(`${fecha}T00:00:00`);
@@ -122,8 +139,8 @@ export class DisponibilidadService {
     return {
       fecha,
       trabaja: true,
-      horaInicio: horario.horaInicio,
-      horaFin: horario.horaFin,
+      horaInicio: this.toHHMM(jornadaIni),
+      horaFin: this.toHHMM(jornadaFin),
       ocupado: ocupadoMerged.map(([a, b]) => ({
         inicio: this.toHHMM(a),
         fin: this.toHHMM(b),

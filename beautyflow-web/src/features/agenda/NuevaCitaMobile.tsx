@@ -90,11 +90,26 @@ export function NuevaCitaMobile({
     queryKey: ['clientes'],
     queryFn: () => api.get('/clientes').then(r => r.data),
   });
+  // ─── Derivados que hacen falta ANTES de la query de disponibilidad ───
+  const authUser = useAuthStore(s => s.user);
+  const soyInquilino = authUser?.rol === 'ALQUILER';
+  const esOwner = authUser?.rol === 'OWNER';
+  const miEmpleado = empleados.find(e => e.usuario?.id === authUser?.id) ?? null;
+
+  // Dejar "Empleado" sin elegir es válido SOLO para el dueño — significa
+  // "la cita es para mí" (el backend resuelve/crea su Empleado fantasma
+  // igual que hace el POS). `miEmpleado` puede no existir todavía si es su
+  // primera cita/venta — en ese caso no hay id que consultar contra
+  // disponibilidad.service.ts, así que se asume libre todo el día (no
+  // puede haber conflictos: si el Empleado no existe, no tiene citas).
+  const empleadoIdEfectivo = empleadoId ?? (esOwner ? miEmpleado?.id ?? null : null);
+  const duenoSinEmpleadoAun = !empleadoId && esOwner && !miEmpleado;
+
   const { data: disp, isLoading: dispLoading } = useQuery<Disponibilidad>({
-    queryKey: ['disponibilidad', empleadoId, fecha],
+    queryKey: ['disponibilidad', empleadoIdEfectivo, fecha],
     queryFn: () =>
-      api.get(`/empleados/${empleadoId}/disponibilidad`, { params: { fecha } }).then(r => r.data),
-    enabled: !!empleadoId && !!fecha,
+      api.get(`/empleados/${empleadoIdEfectivo}/disponibilidad`, { params: { fecha } }).then(r => r.data),
+    enabled: !!empleadoIdEfectivo && !!fecha,
   });
 
   // ─── Derivados ───
@@ -103,10 +118,6 @@ export function NuevaCitaMobile({
     Array.from({ length: 7 }, (_, i) => {
       const d = new Date(hoy); d.setDate(hoy.getDate() + i - 1); return d;
     }), [hoy]);
-
-  const authUser = useAuthStore(s => s.user);
-  const soyInquilino = authUser?.rol === 'ALQUILER';
-  const miEmpleado = empleados.find(e => e.usuario?.id === authUser?.id) ?? null;
 
   // Un inquilino solo puede agendarse a sí mismo — se fija automáticamente
   // en cuanto se conoce su propio empleadoId. El backend lo fuerza igual
@@ -117,11 +128,11 @@ export function NuevaCitaMobile({
     }
   }, [soyInquilino, miEmpleado, empleadoId]);
 
-  // esCuentaDueno excluido: es el Empleado fantasma que se autocrea para el
-  // dueño (resolveEmpleadoRegistra, en el POS) — nunca tiene horario
-  // configurado, así que ofrecerlo acá terminaba siempre en "no trabaja
-  // ese día" sin importar la fecha. Mismo criterio ya usado en el POS
-  // (empleadosServicio) y en el Dashboard (topEmpleados).
+  // esCuentaDueno excluido de la LISTA (no se ofrece como opción clicable):
+  // es el Empleado fantasma que se autocrea para el dueño
+  // (resolveEmpleadoRegistra, en el POS). Dejar "Empleado" sin elegir es
+  // justamente cómo se agenda el dueño a sí mismo (ver empleadoIdEfectivo
+  // arriba) — no tiene que aparecer en la lista para eso.
   const empleadosActivos   = empleados.filter(e => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
   const serviciosFiltrados = servicios.filter(s =>
     s.activo && s.nombre.toLowerCase().includes(busServ.toLowerCase())
@@ -137,12 +148,19 @@ export function NuevaCitaMobile({
   const duracionTotal   = serviciosSel.reduce((a, s) => a + s.duracionMin, 0);
   const precioEstimado  = serviciosSel.reduce((a, s) => a + Number(s.precio), 0);
 
-  const slots = useMemo(
-    () => disp?.trabaja ? generarSlots(disp.disponible, duracionTotal) : [],
-    [disp, duracionTotal]
-  );
+  const slots = useMemo(() => {
+    if (empleadoIdEfectivo) {
+      return disp?.trabaja ? generarSlots(disp.disponible, duracionTotal) : [];
+    }
+    // Dueño sin Empleado creado todavía: no hay nada que consultar, se
+    // asume libre todo el día (ver empleadoIdEfectivo).
+    if (duenoSinEmpleadoAun) return generarSlots([{ inicio: '00:00', fin: '23:59' }], duracionTotal);
+    return [];
+  }, [disp, duracionTotal, empleadoIdEfectivo, duenoSinEmpleadoAun]);
 
   const empleadoSel = empleados.find(e => e.id === empleadoId);
+  // Cuando no se eligió a nadie, la cita queda a nombre del dueño.
+  const nombreProfesional = empleadoSel?.nombre ?? (esOwner ? `${authUser?.nombre ?? 'Tú'} (dueño)` : undefined);
   const clienteSel  = clientes.find(c => c.id === clienteId);
   const fechaObj    = new Date(`${fecha}T00:00:00`);
 
@@ -157,7 +175,10 @@ export function NuevaCitaMobile({
   const crearCita = useMutation({
     mutationFn: () => api.post('/citas', {
       clienteId,
-      empleadoId,
+      // Sin elegir a nadie (solo posible siendo el dueño): se omite del
+      // todo, no se manda null — el backend resuelve/crea el Empleado del
+      // dueño cuando no llega empleadoId.
+      ...(empleadoId ? { empleadoId } : {}),
       fecha,
       horaInicio,
       servicios: serviciosIds,
@@ -178,7 +199,9 @@ export function NuevaCitaMobile({
   });
 
   // ─── Condiciones para avanzar ───
-  const puedeIr2      = !!empleadoId;
+  // El dueño puede avanzar sin elegir a nadie (la cita queda para él);
+  // cualquier otro rol sí tiene que elegir un profesional.
+  const puedeIr2      = !!empleadoId || esOwner;
   const puedeIr3      = serviciosIds.length > 0;
   const puedeIr4      = !!horaInicio;
   const puedeConfirmar = !!clienteId && !crearCita.isPending;
@@ -257,11 +280,18 @@ export function NuevaCitaMobile({
                 </div>
               ) : (
                 <div className={styles.empList}>
-                  {empleadosActivos.length === 0 && (
+                  {empleadosActivos.length === 0 && !esOwner && (
                     <div className={styles.noDisp}>
                       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
                       No hay profesionales disponibles en agenda
                     </div>
+                  )}
+                  {esOwner && (
+                    <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 8px' }}>
+                      {empleadosActivos.length === 0
+                        ? 'Todavía no tenés empleados en Agenda — sin elegir a nadie, la cita queda a tu nombre.'
+                        : 'Si no elegís a nadie, la cita queda a tu nombre.'}
+                    </p>
                   )}
                   {empleadosActivos.map(e => (
                     <button
@@ -335,13 +365,13 @@ export function NuevaCitaMobile({
               <div className={styles.secLabel}>
                 Hora — {DIAS[fechaObj.getDay()]} {fechaObj.getDate()} de {MESES[fechaObj.getMonth()]}
               </div>
-              <div className={styles.secSub}>{empleadoSel?.nombre} · {duracionTotal} min por sesión</div>
+              <div className={styles.secSub}>{nombreProfesional} · {duracionTotal} min por sesión</div>
 
               {dispLoading && (
                 <div className={styles.loadWrap}><span className={styles.spinner} /></div>
               )}
 
-              {!dispLoading && !disp && (
+              {!dispLoading && !disp && !duenoSinEmpleadoAun && (
                 <div className={styles.noDisp}>
                   <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
                   Error al cargar disponibilidad
@@ -351,11 +381,11 @@ export function NuevaCitaMobile({
               {!dispLoading && disp && !disp.trabaja && (
                 <div className={styles.noDisp}>
                   <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-                  {empleadoSel?.nombre} no trabaja ese día
+                  {nombreProfesional} no trabaja ese día
                 </div>
               )}
 
-              {!dispLoading && disp?.trabaja && slots.length === 0 && (
+              {!dispLoading && (disp?.trabaja || duenoSinEmpleadoAun) && slots.length === 0 && (
                 <div className={styles.noDisp}>
                   <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
                   No hay horas disponibles para {duracionTotal} min
@@ -431,7 +461,7 @@ export function NuevaCitaMobile({
                 </div>
                 <div className={styles.resRow}>
                   <span>Empleado</span>
-                  <b>{empleadoSel?.nombre}</b>
+                  <b>{nombreProfesional}</b>
                 </div>
                 <div className={styles.resRow}>
                   <span>Servicios</span>

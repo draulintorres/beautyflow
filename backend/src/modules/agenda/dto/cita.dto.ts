@@ -18,8 +18,11 @@ export class CreateCitaDto {
   @IsUUID()
   clienteId: string;
 
+  /** Opcional: sin elegir profesional, la cita queda para el dueño (solo
+   * si quien la crea es el OWNER — ver resolveEmpleadoParaCita()). */
+  @IsOptional()
   @IsUUID()
-  empleadoId: string;
+  empleadoId?: string;
 
   @IsOptional()
   @IsUUID()

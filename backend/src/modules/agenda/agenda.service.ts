@@ -78,9 +78,18 @@ export class AgendaService {
     // líneas del POS en Pieza 3 (forzar > rechazar: más robusto y no
     // requiere que el frontend adivine bien antes de enviar).
     const inquilino = await this.inquilinoSvc.resolverInquilino();
+    let empleadoId: string;
     if (inquilino.esInquilino) {
-      dto = { ...dto, empleadoId: inquilino.empleadoId! };
+      empleadoId = inquilino.empleadoId!;
+    } else if (dto.empleadoId) {
+      empleadoId = dto.empleadoId;
+    } else {
+      // Sin profesional elegido: la cita queda para el dueño mismo (solo
+      // válido si quien crea la cita ES el OWNER — resolveEmpleadoParaCita
+      // rechaza cualquier otro rol en vez de adivinar).
+      empleadoId = (await this.resolveEmpleadoParaCita()).id;
     }
+    dto = { ...dto, empleadoId };
 
     // 1. Validar cliente y empleado
     const [cliente, empleado] = await Promise.all([
@@ -89,7 +98,7 @@ export class AgendaService {
         select: { id: true },
       }),
       this.prisma.db.empleado.findFirst({
-        where: { id: dto.empleadoId },
+        where: { id: empleadoId },
         select: { id: true, sucursalId: true },
       }),
     ]);
@@ -125,7 +134,7 @@ export class AgendaService {
 
     // 4. Anti-solapamiento del empleado (regla más importante)
     const libre = await this.disponibilidad.estaDisponible(
-      dto.empleadoId,
+      empleadoId,
       inicio,
       fin,
     );
@@ -173,7 +182,7 @@ export class AgendaService {
       data: {
         sucursalId,
         clienteId: dto.clienteId,
-        empleadoId: dto.empleadoId,
+        empleadoId,
         cabinaId,
         inicio,
         fin,
@@ -199,7 +208,7 @@ export class AgendaService {
       entidad: 'Cita',
       entidadId: cita.id,
       accion: 'CREATE',
-      datosDespues: { empleadoId: dto.empleadoId, inicio, fin, total },
+      datosDespues: { empleadoId, inicio, fin, total },
     });
 
     await this.notif.notificar({
@@ -510,6 +519,48 @@ export class AgendaService {
   }
 
   // ---------- helpers ----------
+  /**
+   * Resuelve el Empleado a usar cuando Nueva Cita se manda sin
+   * empleadoId — el dueño dejó "Empleado" sin elegir para agendarse a sí
+   * mismo. Mismo patrón que resolveEmpleadoRegistra() en
+   * ventas.service.ts (POS), reimplementado acá a propósito: Agenda es un
+   * flujo distinto y ese método ya cerrado no debía tocarse. Si el
+   * Empleado del usuario actual no existe todavía, se crea (esCuentaDueno)
+   * SOLO si es el OWNER — cualquier otro rol sin Empleado vinculado se
+   * rechaza en vez de adivinar a quién asignarle la cita.
+   */
+  private async resolveEmpleadoParaCita(): Promise<{
+    id: string;
+    sucursalId: string | null;
+  }> {
+    const user = getCurrentUser();
+    const existente = await this.prisma.db.empleado.findFirst({
+      where: { usuarioId: user.usuarioId },
+      select: { id: true, sucursalId: true },
+    });
+    if (existente) return existente;
+
+    if (user.rol !== RoleKey.OWNER) {
+      throw new BadRequestException(
+        'Elegí un profesional para la cita, o pedí que vinculen tu usuario a un empleado desde Equipo.',
+      );
+    }
+
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: user.usuarioId },
+      select: { nombre: true },
+    });
+    return this.prisma.db.empleado.create({
+      data: {
+        usuarioId: user.usuarioId,
+        nombre: usuario?.nombre ?? 'Dueño',
+        activo: true,
+        esCuentaDueno: true,
+      } as any,
+      select: { id: true, sucursalId: true },
+    });
+  }
+
   /**
    * Corrección (agenda del inquilino): si quien opera es un inquilino y la
    * cita no es suya, 404 (no revelar existencia) — mismo patrón que el
