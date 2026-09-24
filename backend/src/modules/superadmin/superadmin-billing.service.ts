@@ -102,6 +102,13 @@ export class SuperAdminBillingService {
       day: 'numeric', month: 'long', year: 'numeric',
     });
     const loginUrl = `${this.frontendUrl}/login`;
+    // Mismo número de soporte que ya usa el frontend (lib/soporte.ts) —
+    // no se puede reusar ese helper acá (es del bundle del frontend), así
+    // que se repite el mismo número y formato de link de wa.me.
+    const mensajeWa = encodeURIComponent(
+      `Hola, tengo una duda sobre el pago pendiente de ${empresaNombre}.`,
+    );
+    const linkWhatsApp = `https://wa.me/18492606783?text=${mensajeWa}`;
 
     await this.email.enviar(
       owner.email,
@@ -123,7 +130,10 @@ export class SuperAdminBillingService {
           ? '<p>Al estar vencida, tu acceso a Estixa puede quedar suspendido hasta regularizar el pago.</p>'
           : ''
         }
-        <p>Si ya lo pagaste, ignorá este correo. Cualquier duda, escribinos.</p>
+        <p>
+          Si ya lo pagaste, ignorá este correo. Cualquier duda, escribinos por WhatsApp al
+          <a href="${linkWhatsApp}">849-260-6783</a>.
+        </p>
         <p><a href="${loginUrl}">${loginUrl}</a></p>
       `,
     );
