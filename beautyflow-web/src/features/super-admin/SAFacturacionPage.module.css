@@ -131,6 +131,18 @@
 }
 .payBtn:hover { background: rgba(201,162,75,.2); }
 
+.acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.reminderBtn {
+  font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text); border-radius: 8px;
+  padding: 6px 13px; cursor: pointer; font-family: var(--font-body);
+  white-space: nowrap; transition: background .15s;
+}
+.reminderBtn:hover { background: var(--surface-2); }
+
 /* Loader / vacío */
 .loadWrap { display: flex; justify-content: center; padding: 50px; }
 .spinner {

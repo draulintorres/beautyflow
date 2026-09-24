@@ -146,6 +146,12 @@ export class SuperAdminController {
     return this.billing.registrarPago(dto);
   }
 
+  @Post('facturas/:id/recordatorio')
+  @HttpCode(HttpStatus.OK)
+  enviarRecordatorio(@Param('id', ParseUUIDPipe) id: string) {
+    return this.billing.enviarRecordatorio(id);
+  }
+
   // ---------- JOB: SUSPENSIÓN AUTOMÁTICA ----------
   @Post('jobs/suspender-morosas')
   @HttpCode(HttpStatus.OK)

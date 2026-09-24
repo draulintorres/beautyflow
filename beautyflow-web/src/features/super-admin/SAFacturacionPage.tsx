@@ -38,7 +38,7 @@ function fmtFecha(iso: string | null) {
 export function SAFacturacionPage() {
   const qc = useQueryClient();
   const [filtro, setFiltro]     = useState<typeof FILTROS[number]>('TODAS');
-  const [confirm, setConfirm]   = useState<null | { tipo: 'generar' | 'pagar' | 'morosas'; factura?: Factura }>(null);
+  const [confirm, setConfirm]   = useState<null | { tipo: 'generar' | 'pagar' | 'morosas' | 'recordatorio'; factura?: Factura }>(null);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
 
   const { data: facturas = [], isLoading } = useQuery<Factura[]>({
@@ -80,6 +80,21 @@ export function SAFacturacionPage() {
       qc.invalidateQueries({ queryKey: ['sa-empresas'] });
     },
     onError: () => { setResultMsg('No se pudo registrar el pago.'); setConfirm(null); },
+  });
+
+  const enviarRecordatorio = useMutation({
+    mutationFn: (facturaId: string) =>
+      saApi.post(`/admin/facturas/${facturaId}/recordatorio`).then(r => r.data),
+    onSuccess: (res: { email?: string }) => {
+      setResultMsg(`Recordatorio enviado${res.email ? ` a ${res.email}` : ''}.`);
+      setConfirm(null);
+    },
+    onError: (e: unknown) => {
+      const ax = e as { response?: { data?: { message?: string | string[] } } };
+      const msg = ax?.response?.data?.message;
+      setResultMsg(Array.isArray(msg) ? msg.join(' · ') : (msg ?? 'No se pudo enviar el recordatorio.'));
+      setConfirm(null);
+    },
   });
 
   const suspenderMorosas = useMutation({
@@ -197,14 +212,22 @@ export function SAFacturacionPage() {
                           {st.label}
                         </span>
                       </td>
-                      <td>
+                      <td className={styles.acciones}>
                         {(f.status === 'PENDIENTE' || f.status === 'VENCIDA') && (
-                          <button
-                            className={styles.payBtn}
-                            onClick={() => setConfirm({ tipo: 'pagar', factura: f })}
-                          >
-                            Registrar pago
-                          </button>
+                          <>
+                            <button
+                              className={styles.payBtn}
+                              onClick={() => setConfirm({ tipo: 'pagar', factura: f })}
+                            >
+                              Registrar pago
+                            </button>
+                            <button
+                              className={styles.reminderBtn}
+                              onClick={() => setConfirm({ tipo: 'recordatorio', factura: f })}
+                            >
+                              Enviar recordatorio
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -260,6 +283,36 @@ export function SAFacturacionPage() {
           <p className={styles.modalNote}>
             La factura quedará pagada, se renovará la suscripción y, si la empresa estaba
             suspendida por mora, se reactivará automáticamente.
+          </p>
+        </ConfirmModal>
+      )}
+
+      {confirm?.tipo === 'recordatorio' && confirm.factura && (
+        <ConfirmModal
+          title="Enviar recordatorio de pago"
+          confirmLabel="Enviar recordatorio"
+          confirmStyle="primary"
+          loading={enviarRecordatorio.isPending}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => enviarRecordatorio.mutate(confirm.factura!.id)}
+        >
+          <p>Se le enviará un correo al dueño de la empresa recordándole este pago pendiente:</p>
+          <div className={styles.confirmBox}>
+            <div className={styles.cbRow}>
+              <span>Empresa</span>
+              <b>{confirm.factura.subscription?.empresa?.nombre ?? '—'}</b>
+            </div>
+            <div className={styles.cbRow}>
+              <span>Período</span>
+              <b>{fmtPeriodo(confirm.factura.periodo)}</b>
+            </div>
+            <div className={styles.cbRow}>
+              <span>Monto</span>
+              <b>RD$ {fmtMonto(confirm.factura.monto)}</b>
+            </div>
+          </div>
+          <p className={styles.modalNote}>
+            El correo no incluye ningún dato de pago ni contraseñas — solo el aviso y el enlace para iniciar sesión.
           </p>
         </ConfirmModal>
       )}
