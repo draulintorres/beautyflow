@@ -29,7 +29,12 @@
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
     <link rel="icon" type="image/png" href="/favicon-16.png" sizes="16x16" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: sin esto, env(safe-area-inset-top/bottom) siempre
+         resuelve a 0 en iOS (aunque se use en el CSS), así que el header/nav
+         móvil quedarían tapados por el notch/isla dinámica o la barra de
+         inicio en modo standalone (PWA instalada, ver apple-mobile-web-app-*
+         abajo, que ya activa la barra de estado translúcida). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0a0a0b" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
