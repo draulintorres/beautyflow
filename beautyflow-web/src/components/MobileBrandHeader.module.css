@@ -1,0 +1,51 @@
+.header {
+  display: none;
+}
+
+.logoMark {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.logoWord {
+  font-size: 15px;
+  font-weight: var(--fw-semibold);
+  background: linear-gradient(180deg, #f4e4b8, var(--gold) 55%, var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1;
+}
+
+/* Tema claro: mismo criterio que Sidebar.module.css .logoWord — el
+   degradado dorado pasa a color sólido para que se lea sobre fondo claro. */
+:root[data-theme="light"] .logoWord {
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  -webkit-text-fill-color: var(--gold-text);
+  color: var(--gold-text);
+}
+
+@media (max-width: 768px) {
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: calc(52px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 16px 0;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, var(--sidebar-1), var(--sidebar-2));
+    border-bottom: 1px solid var(--line);
+    z-index: 200;
+    /* Mismo fix que MobileNav.module.css para el "flote" de un
+       position:fixed con blur/gradiente durante scroll rápido en iOS Safari. */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { Topbar } from '../components/Topbar';
+import { MobileBrandHeader } from '../components/MobileBrandHeader';
 import { MobileNav } from '../components/MobileNav';
 import { MobileMoreSheet } from '../components/MobileMoreSheet';
 import styles from './AppLayout.module.css';
@@ -25,6 +26,7 @@ export function AppLayout() {
   return (
     <div className={styles.shell}>
       <Sidebar />
+      <MobileBrandHeader />
       <div className={styles.main}>
         <Topbar title={meta.title} subtitle={meta.subtitle} />
         <div className={styles.content}>
