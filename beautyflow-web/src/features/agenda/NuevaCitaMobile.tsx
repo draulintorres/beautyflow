@@ -190,8 +190,16 @@ export function NuevaCitaMobile({
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message;
-      if (err?.response?.status === 409) {
-        setErrMsg(typeof msg === 'string' ? msg : 'Horario no disponible. Elige otra hora.');
+      const status = err?.response?.status;
+      // Antes esto mostraba el mensaje real solo para 409 y un genérico
+      // para cualquier otro caso (400 incluido) -- ocultaba la razón real
+      // que el backend sí manda (ej. "Se requiere una sucursal para
+      // asignar cabina"), dejando a quien usa la app sin pista de qué
+      // corregir.
+      if (status === 409 || status === 400) {
+        setErrMsg(
+          typeof msg === 'string' ? msg : Array.isArray(msg) ? msg[0] : 'No se pudo crear la cita. Verifica los datos e intenta de nuevo.'
+        );
       } else {
         setErrMsg('No se pudo crear la cita. Verifica los datos e intenta de nuevo.');
       }

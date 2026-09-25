@@ -536,9 +536,27 @@ export class AgendaService {
     const user = getCurrentUser();
     const existente = await this.prisma.db.empleado.findFirst({
       where: { usuarioId: user.usuarioId },
-      select: { id: true, sucursalId: true },
+      select: { id: true, sucursalId: true, esCuentaDueno: true },
     });
-    if (existente) return existente;
+    if (existente) {
+      // Backfill puntual: dueños cuyo Empleado fantasma se creó ANTES de
+      // este fix (ej. desde el POS, que nunca necesitó sucursalId) se
+      // quedaron sin sucursal — sin esto, seguían topándose con "Se
+      // requiere una sucursal para asignar cabina" para siempre. Solo se
+      // toca si es esCuentaDueno: un empleado real sin sucursal puede ser
+      // así a propósito, no se le toca nada.
+      if (existente.esCuentaDueno && !existente.sucursalId) {
+        const sucursalId = await this.resolverSucursalPrincipal();
+        if (sucursalId) {
+          return this.prisma.db.empleado.update({
+            where: { id: existente.id },
+            data: { sucursalId },
+            select: { id: true, sucursalId: true },
+          });
+        }
+      }
+      return existente;
+    }
 
     if (user.rol !== RoleKey.OWNER) {
       throw new BadRequestException(
@@ -546,19 +564,39 @@ export class AgendaService {
       );
     }
 
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { id: user.usuarioId },
-      select: { nombre: true },
-    });
+    const [usuario, sucursalId] = await Promise.all([
+      this.prisma.usuario.findUnique({
+        where: { id: user.usuarioId },
+        select: { nombre: true },
+      }),
+      this.resolverSucursalPrincipal(),
+    ]);
     return this.prisma.db.empleado.create({
       data: {
         usuarioId: user.usuarioId,
         nombre: usuario?.nombre ?? 'Dueño',
         activo: true,
         esCuentaDueno: true,
+        sucursalId,
       } as any,
       select: { id: true, sucursalId: true },
     });
+  }
+
+  /**
+   * Mismo criterio que resolverSucursalPrincipal() en ventas.service.ts:
+   * la marcada esPrincipal, o si no hay ninguna, la primera activa. Sin
+   * esto, el Empleado del dueño nacía sin sucursal y cualquier cita con un
+   * servicio que requiere cabina fallaba con "Se requiere una sucursal
+   * para asignar cabina" -- confirmado en vivo probando esta ronda.
+   */
+  private async resolverSucursalPrincipal(): Promise<string | undefined> {
+    const principal = await this.prisma.db.sucursal.findFirst({
+      where: { activo: true },
+      orderBy: [{ esPrincipal: 'desc' }, { createdAt: 'asc' }],
+      select: { id: true },
+    });
+    return principal?.id;
   }
 
   /**
