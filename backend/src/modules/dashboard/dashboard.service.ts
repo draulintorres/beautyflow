@@ -265,10 +265,18 @@ export class DashboardService {
   // ============ RANKINGS ============
   async rankings(sucursalIdReq?: string) {
     const sucursalId = await this.scopeSucursalId(sucursalIdReq);
-    const [topEmpleados, comisiones, topClientes] = await Promise.all([
+    const [topEmpleados, comisiones, topClientes, empleadosReales] = await Promise.all([
       this.topEmpleados(sucursalId),
       this.comisionesPendientesData(sucursalId),
       this.topClientes(sucursalId),
+      // Personal contratado real (excluye el Empleado fantasma del dueño,
+      // mismo criterio que LimitsService y topEmpleados) — el Dashboard
+      // móvil lo usa para decidir si "Top empleados"/"Comisiones
+      // pendientes" tiene sentido mostrarse o si conviene reemplazarlos
+      // por "Servicios más vendidos" mientras la empresa no tenga staff.
+      this.prisma.db.empleado.count({
+        where: { esCuentaDueno: false, activo: true, ...this.sucFilter(sucursalId) },
+      }),
     ]);
     return {
       topEmpleados,
@@ -276,6 +284,7 @@ export class DashboardService {
       comisionesPendientesDetalle: comisiones.porEmpleado,
       comisionesPendientesSinAsignar: comisiones.sinAsignar,
       topClientes,
+      empleadosReales,
     };
   }
 

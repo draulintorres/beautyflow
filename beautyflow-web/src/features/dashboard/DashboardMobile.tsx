@@ -16,7 +16,9 @@ interface Rankings {
   comisionesPendientesDetalle: { empleadoId: string; nombre: string; monto: number }[];
   comisionesPendientesSinAsignar: number;
   topClientes: { clienteId: string; nombre: string; gastoTotal: number }[];
+  empleadosReales: number;
 }
+interface ServicioVendido { id: string; nombre: string; cantidad: number; total: number }
 interface SucursalLite { sucursalId: string; nombre: string; }
 interface Cita {
   id: string;
@@ -31,6 +33,10 @@ interface Cita {
 interface Props {
   kpis: Kpis | undefined;
   rankings: Rankings | undefined;
+  /** Mismos datos que ya calcula `graficas.serviciosMasVendidos` para el
+   *  donut de escritorio — se reutilizan acá para el bloque que reemplaza
+   *  a "Top empleados"/"Comisiones pendientes" cuando no hay staff real. */
+  serviciosMasVendidos?: ServicioVendido[];
   /** Lista de sucursales para el selector (solo llega si aplica: OWNER,
    *  módulo sucursales, >1 sucursal activa). undefined = no mostrar selector. */
   sucursales?: SucursalLite[];
@@ -75,10 +81,18 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function DashboardMobile({ kpis, rankings, sucursales, sucSel, onSelSucursal }: Props) {
+export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursales, sucSel, onSelSucursal }: Props) {
   const user    = useAuthStore(s => s.user);
   const empresa = useAuthStore(s => s.empresa);
   const navigate = useNavigate();
+
+  // Mientras la empresa no tenga ningún empleado real contratado (solo el
+  // Empleado fantasma del dueño, esCuentaDueno=true, que no cuenta acá —
+  // ver dashboard.service.ts rankings()), "Top empleados"/"Comisiones
+  // pendientes" siempre van a estar vacíos estructuralmente. Se reemplazan
+  // por "Servicios más vendidos", útil para cualquier negocio.
+  const tieneEmpleados = (rankings?.empleadosReales ?? 0) > 0;
+  const maxSvc = Math.max(1, ...(serviciosMasVendidos ?? []).map(s => s.cantidad));
 
   // "Citas de hoy" también se filtra a la sucursal elegida (para el OWNER),
   // así calza con el contador "Citas hoy" de arriba.
@@ -210,56 +224,83 @@ export function DashboardMobile({ kpis, rankings, sucursales, sucSel, onSelSucur
         )}
       </div>
 
-      {/* ─── Top empleados ─── */}
-      <div className={styles.section}>
-        <div className={styles.secHead}>
-          <span className={styles.secTitle}>Top empleados</span>
-        </div>
-        {(rankings?.topEmpleados ?? []).length === 0 ? (
-          <div className={styles.empty}>Sin datos de empleados aún</div>
-        ) : (
-          <div className={styles.empList}>
-            {rankings!.topEmpleados.slice(0, 3).map((e, i) => (
-              <div key={e.empleadoId} className={styles.empRow}>
-                <span className={styles.empPos}>{i + 1}</span>
-                <div className={styles.empAv}>{initiales(e.nombre)}</div>
-                <span className={styles.empNm}>{e.nombre.split(' ')[0]}</span>
-                <span className={styles.empAmt}>RD$ {formatMoney(e.ingresos)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ─── Comisiones pendientes ─── */}
-      <div className={styles.section}>
-        <div className={styles.secHead}>
-          <span className={styles.secTitle}>Comisiones pendientes</span>
-          <button type="button" className={styles.verMas} onClick={() => navigate('/comisiones')}>
-            Ver detalle →
-          </button>
-        </div>
-        <div className={styles.commTotal}>RD$ {formatMoney(rankings?.comisionesPendientes ?? 0)}</div>
-        <div className={styles.commSub}>Total por pagar a empleados</div>
-        {(rankings?.comisionesPendientesDetalle ?? []).length === 0 ? (
-          <div className={styles.empty}>Sin comisiones pendientes</div>
-        ) : (
-          <div className={styles.commList}>
-            {rankings!.comisionesPendientesDetalle.map(c => (
-              <div key={c.empleadoId} className={styles.commRow}>
-                <span className={styles.commNm}>{c.nombre}</span>
-                <span className={styles.commAmt}>RD$ {formatMoney(c.monto)}</span>
-              </div>
-            ))}
-            {(rankings?.comisionesPendientesSinAsignar ?? 0) > 0 && (
-              <div className={styles.commRow}>
-                <span className={styles.commNm} style={{ color: 'var(--muted)' }}>Sin empleado asignado</span>
-                <span className={styles.commAmt}>RD$ {formatMoney(rankings!.comisionesPendientesSinAsignar)}</span>
+      {tieneEmpleados ? (
+        <>
+          {/* ─── Top empleados ─── */}
+          <div className={styles.section}>
+            <div className={styles.secHead}>
+              <span className={styles.secTitle}>Top empleados</span>
+            </div>
+            {(rankings?.topEmpleados ?? []).length === 0 ? (
+              <div className={styles.empty}>Sin datos de empleados aún</div>
+            ) : (
+              <div className={styles.empList}>
+                {rankings!.topEmpleados.slice(0, 3).map((e, i) => (
+                  <div key={e.empleadoId} className={styles.empRow}>
+                    <span className={styles.empPos}>{i + 1}</span>
+                    <div className={styles.empAv}>{initiales(e.nombre)}</div>
+                    <span className={styles.empNm}>{e.nombre.split(' ')[0]}</span>
+                    <span className={styles.empAmt}>RD$ {formatMoney(e.ingresos)}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        )}
-      </div>
+
+          {/* ─── Comisiones pendientes ─── */}
+          <div className={styles.section}>
+            <div className={styles.secHead}>
+              <span className={styles.secTitle}>Comisiones pendientes</span>
+              <button type="button" className={styles.verMas} onClick={() => navigate('/comisiones')}>
+                Ver detalle →
+              </button>
+            </div>
+            <div className={styles.commTotal}>RD$ {formatMoney(rankings?.comisionesPendientes ?? 0)}</div>
+            <div className={styles.commSub}>Total por pagar a empleados</div>
+            {(rankings?.comisionesPendientesDetalle ?? []).length === 0 ? (
+              <div className={styles.empty}>Sin comisiones pendientes</div>
+            ) : (
+              <div className={styles.commList}>
+                {rankings!.comisionesPendientesDetalle.map(c => (
+                  <div key={c.empleadoId} className={styles.commRow}>
+                    <span className={styles.commNm}>{c.nombre}</span>
+                    <span className={styles.commAmt}>RD$ {formatMoney(c.monto)}</span>
+                  </div>
+                ))}
+                {(rankings?.comisionesPendientesSinAsignar ?? 0) > 0 && (
+                  <div className={styles.commRow}>
+                    <span className={styles.commNm} style={{ color: 'var(--muted)' }}>Sin empleado asignado</span>
+                    <span className={styles.commAmt}>RD$ {formatMoney(rankings!.comisionesPendientesSinAsignar)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* ─── Servicios más vendidos (reemplaza Top empleados/Comisiones
+             mientras la empresa no tenga ningún empleado real) ─── */
+        <div className={styles.section}>
+          <div className={styles.secHead}>
+            <span className={styles.secTitle}>Servicios más vendidos</span>
+          </div>
+          {(serviciosMasVendidos ?? []).length === 0 ? (
+            <div className={styles.empty}>Aún no hay ventas registradas</div>
+          ) : (
+            <div className={styles.rankList}>
+              {serviciosMasVendidos!.slice(0, 5).map(s => (
+                <div key={s.id} className={styles.rankItem}>
+                  <span className={styles.rankNm}>{s.nombre}</span>
+                  <div className={styles.rankTrack}>
+                    <div className={styles.rankFill} style={{ width: `${(s.cantidad / maxSvc) * 100}%` }} />
+                  </div>
+                  <span className={styles.rankAmt}>{s.cantidad}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={styles.navSpacer} />
     </div>

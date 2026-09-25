@@ -339,6 +339,48 @@
   color: var(--gold-text);
 }
 
+/* ─── Servicios más vendidos (reemplaza Top empleados/Comisiones cuando
+     la empresa no tiene empleados reales) ─── */
+.rankList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rankItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rankNm {
+  font-size: 13px;
+  width: 100px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rankTrack {
+  flex: 1;
+  height: 7px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.rankFill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-deep));
+  transition: width 0.4s ease;
+}
+.rankAmt {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--gold-text);
+  width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
 /* ─── Bottom spacer for fixed nav ─── */
 .navSpacer {
   height: 80px;

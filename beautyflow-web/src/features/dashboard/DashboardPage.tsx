@@ -30,6 +30,7 @@ interface Rankings {
   comisionesPendientesDetalle: ComisionEmpleado[];
   comisionesPendientesSinAsignar: number;
   topClientes: { clienteId: string; nombre: string; gastoTotal: number }[];
+  empleadosReales: number;
 }
 interface SucursalVentas {
   sucursalId: string; nombre: string; esPrincipal: boolean;
@@ -181,6 +182,7 @@ export function DashboardPage() {
         <DashboardMobile
           kpis={kpis}
           rankings={rankings}
+          serviciosMasVendidos={graficas?.serviciosMasVendidos}
           sucursales={mostrarTabSucursales ? sucursales! : undefined}
           sucSel={sucSel}
           onSelSucursal={setSucSelId}
