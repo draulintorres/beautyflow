@@ -94,6 +94,13 @@
   padding: 15px 16px;
 }
 
+/* Tarjeta que ocupa las 2 columnas cuando el grid queda con un número
+   impar de tarjetas (ej. al ocultar "Ticket prom.") — evita el hueco
+   vacío que dejaría un grid de 2 columnas con 3 hijos. */
+.kpiCardWide {
+  grid-column: 1 / -1;
+}
+
 .kpiLabel {
   font-size: 11px;
   color: var(--muted);

@@ -19,7 +19,12 @@
 
 /* ─── KPI grids ─── */
 .kpiGrid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.kpiGrid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: 560px; }
+/* kpiGrid2 quedó con 1 sola tarjeta ("% Ocupación hoy") desde que se ocultó
+   "Ticket promedio" — 1 columna, mismo ancho que tenía cada mitad del par
+   original (max-width: 560px con 2 columnas y 14px de gap ≈ 273px c/u), en
+   vez de dejar la tarjeta sola con un hueco vacío al lado o estirarla a
+   todo el ancho de 560px. */
+.kpiGrid2 { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 273px; }
 
 /* ─── Panels ─── */
 .panel {

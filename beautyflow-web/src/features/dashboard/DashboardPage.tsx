@@ -240,12 +240,12 @@ export function DashboardPage() {
         />
       </div>
 
-      {/* ─── KPI row 2 ─── */}
+      {/* ─── KPI row 2 ───
+          "Ticket promedio" se ocultó a pedido de Draulin (confunde a
+          clientes/testers) — el cálculo sigue viniendo en kpis.ticketPromedio,
+          solo se dejó de renderizar. kpiGrid2 pasa a 1 columna (ver CSS) para
+          que "% Ocupación hoy" no quede con un hueco vacío al lado. */}
       <div className={styles.kpiGrid2}>
-        <KpiCard label="Ticket promedio" color="gold"
-          value={`RD$ ${formatMoney(kpis?.ticketPromedio ?? 0)}`}
-          icon={<svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h12"/></svg>}
-        />
         <KpiCard label="% Ocupación hoy" color="gold"
           value={`${kpis?.porcentajeOcupacion ?? 0}%`}
           icon={<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 2 4-6"/></svg>}

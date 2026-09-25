@@ -175,11 +175,11 @@ export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursal
           <div className={styles.kpiLabel}>Citas hoy</div>
           <div className={styles.kpiVal}>{kpis?.citasHoy ?? 0}</div>
         </div>
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiLabel}>Ticket prom.</div>
-          <div className={styles.kpiVal}>RD$ {formatMoney(kpis?.ticketPromedio ?? 0)}</div>
-        </div>
-        <div className={styles.kpiCard}>
+        {/* "Ticket prom." se ocultó a pedido de Draulin (confunde a
+            clientes/testers) — el cálculo sigue viniendo en kpis.ticketPromedio,
+            solo se dejó de renderizar. "Ventas mes" pasa a ocupar las dos
+            columnas para no dejar el hueco de la tarjeta que faltaría. */}
+        <div className={`${styles.kpiCard} ${styles.kpiCardWide}`}>
           <div className={styles.kpiLabel}>Ventas mes</div>
           <div className={styles.kpiVal}>RD$ {formatMoney(kpis?.ventasMes ?? 0)}</div>
         </div>
