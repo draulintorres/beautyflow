@@ -18,6 +18,13 @@ interface EmpresaInfo {
   totalSucursales: number;
   maxSucursales: number | null;
 }
+interface Cabina {
+  id: string;
+  nombre: string;
+  sucursalId: string;
+  activa: boolean;
+  sucursal?: { id: string; nombre: string };
+}
 
 // ── Helpers ────────────────────────────────────────────
 const OWNER_ADMIN = new Set(['OWNER', 'ADMIN']);
@@ -189,6 +196,199 @@ function SucursalModal({
   );
 }
 
+// ── CabinaModal (crear / editar) ───────────────────────
+function CabinaModal({
+  data, sucursales, onClose, onSuccess,
+}: {
+  data?: Cabina;
+  sucursales: Sucursal[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const isEdit = !!data;
+  const [form, setForm] = useState({
+    nombre: data?.nombre ?? '',
+    sucursalId: data?.sucursalId ?? sucursales.find((s) => s.esPrincipal)?.id ?? sucursales[0]?.id ?? '',
+  });
+  const [err, setErr] = useState('');
+  const qc = useQueryClient();
+
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const guardar = useMutation({
+    mutationFn: () => {
+      const body = { nombre: form.nombre, sucursalId: form.sucursalId };
+      return isEdit
+        ? api.patch(`/cabinas/${data!.id}`, { nombre: body.nombre }).then((r) => r.data)
+        : api.post('/cabinas', body).then((r) => r.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cabinas'] });
+      onSuccess();
+    },
+    onError: (e) => setErr(errMsg(e)),
+  });
+
+  const isValid = form.nombre.trim().length > 0 && !!form.sucursalId;
+
+  return (
+    <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={`${styles.modal} ${styles.modalSm}`} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHead}>
+          <h3>{isEdit ? 'Editar cabina' : 'Nueva cabina'}</h3>
+          <button type="button" onClick={onClose}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div className={styles.modalBody}>
+          <div className={styles.formField}>
+            <label>Nombre *</label>
+            <input
+              value={form.nombre}
+              onChange={(e) => set('nombre', e.target.value)}
+              placeholder="Ej. Cabina 1, Sala facial"
+              maxLength={100}
+            />
+          </div>
+          <div className={styles.formField}>
+            <label>Sucursal *</label>
+            <select
+              className={styles.selectInput}
+              value={form.sucursalId}
+              onChange={(e) => set('sucursalId', e.target.value)}
+              disabled={isEdit}
+            >
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+            {isEdit && <span className={styles.fieldHint}>Para cambiarla de sucursal, elimina esta cabina y crea una nueva.</span>}
+          </div>
+
+          {err && <div className={styles.modalErr}>{err}</div>}
+        </div>
+
+        <div className={styles.modalFoot}>
+          <button type="button" className={styles.btnCancel} onClick={onClose} disabled={guardar.isPending}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className={styles.btnSave}
+            onClick={() => guardar.mutate()}
+            disabled={!isValid || guardar.isPending}
+          >
+            {guardar.isPending ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear cabina'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── CabinaRow (desktop) ─────────────────────────────────
+function CabinaRow({
+  c, canWrite, menuOpen, onMenuToggle, onEdit, onToggleActiva, onEliminar,
+}: {
+  c: Cabina;
+  canWrite: boolean;
+  menuOpen: boolean;
+  onMenuToggle: () => void;
+  onEdit: () => void;
+  onToggleActiva: () => void;
+  onEliminar: () => void;
+}) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [dropPos, setDropPos] = useState<{ top: number; right: number } | null>(null);
+
+  function handleToggle() {
+    if (!menuOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const top = spaceBelow < APPROX_MENU_H ? rect.top - APPROX_MENU_H - 4 : rect.bottom + 4;
+      setDropPos({ top, right: window.innerWidth - rect.right });
+    }
+    onMenuToggle();
+  }
+
+  return (
+    <tr>
+      <td><span className={styles.sucursalNombre}>{c.nombre}</span></td>
+      <td className={styles.mutedCell}>{c.sucursal?.nombre ?? '—'}</td>
+      <td>
+        <span className={c.activa ? styles.badgeOn : styles.badgeOff}>
+          {c.activa ? 'Activa' : 'Desactivada'}
+        </span>
+      </td>
+      <td>
+        {canWrite && (
+          <div className={styles.menuWrap} onClick={(e) => e.stopPropagation()}>
+            <button ref={btnRef} type="button" className={styles.menuBtn} onClick={handleToggle}>
+              <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
+                <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+              </svg>
+            </button>
+            {menuOpen && dropPos && (
+              <div className={styles.menuDropdown} style={{ top: dropPos.top, right: dropPos.right }}>
+                <button type="button" onClick={onEdit}>Editar</button>
+                <button type="button" onClick={onToggleActiva}>
+                  {c.activa ? 'Desactivar' : 'Activar'}
+                </button>
+                <div className={styles.menuDivider} />
+                <button type="button" className={styles.menuItemDanger} onClick={onEliminar}>
+                  Eliminar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+// ── MobileCabinaCard ────────────────────────────────────
+function MobileCabinaCard({
+  c, canWrite, onEdit, onToggleActiva, onEliminar,
+}: {
+  c: Cabina;
+  canWrite: boolean;
+  onEdit: () => void;
+  onToggleActiva: () => void;
+  onEliminar: () => void;
+}) {
+  return (
+    <div className={styles.mobileCard}>
+      <div className={styles.mobileCardTop}>
+        <div className={styles.mobileCardLeft}>
+          <div className={styles.mobileCardName}>{c.nombre}</div>
+          <div className={styles.mobileCardDir}>{c.sucursal?.nombre ?? '—'}</div>
+        </div>
+        <span className={c.activa ? styles.badgeOn : styles.badgeOff}>
+          {c.activa ? 'Activa' : 'Desactivada'}
+        </span>
+      </div>
+      {canWrite && (
+        <div className={styles.mobileCardActions}>
+          <button type="button" className={styles.mobileActionBtn} onClick={onEdit}>Editar</button>
+          <button type="button" className={styles.mobileActionBtn} onClick={onToggleActiva}>
+            {c.activa ? 'Desactivar' : 'Activar'}
+          </button>
+          <button
+            type="button"
+            className={`${styles.mobileActionBtn} ${styles.mobileActionDanger}`}
+            onClick={onEliminar}
+          >
+            Eliminar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── SucursalRow (desktop) ──────────────────────────────
 function SucursalRow({
   s, isOnly, canWrite, menuOpen, onMenuToggle, onEdit, onSetPrincipal,
@@ -355,6 +555,15 @@ export function SucursalesPage() {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // ── Cabinas ──
+  const [modalCreateCabina, setModalCreateCabina] = useState(false);
+  const [editCabina, setEditCabina] = useState<Cabina | null>(null);
+  const [confirmCabina, setConfirmCabina] = useState<{
+    type: 'desactivar' | 'activar' | 'eliminar';
+    cabina: Cabina;
+  } | null>(null);
+  const [menuOpenCabina, setMenuOpenCabina] = useState<string | null>(null);
+
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3800);
@@ -368,6 +577,11 @@ export function SucursalesPage() {
   const { data: empresa } = useQuery<EmpresaInfo>({
     queryKey: ['empresa-info'],
     queryFn: () => api.get('/empresa').then((r) => r.data),
+  });
+
+  const { data: cabinas = [], isLoading: isLoadingCabinas } = useQuery<Cabina[]>({
+    queryKey: ['cabinas'],
+    queryFn: () => api.get('/cabinas').then((r) => r.data),
   });
 
   const totalSucursales = empresa?.totalSucursales ?? sucursales.length;
@@ -483,8 +697,84 @@ export function SucursalesPage() {
     }
   }
 
+  // ── Cabinas: handlers ──
+  async function handleActionCabina(fn: () => Promise<unknown>, successMsg: string) {
+    setActionLoading(true);
+    try {
+      await fn();
+      qc.invalidateQueries({ queryKey: ['cabinas'] });
+      showToast(successMsg);
+    } catch (e) {
+      showToast(errMsg(e), false);
+    } finally {
+      setActionLoading(false);
+      setConfirmCabina(null);
+    }
+  }
+
+  function requestToggleActivaCabina(c: Cabina) {
+    setConfirmCabina({ type: c.activa ? 'desactivar' : 'activar', cabina: c });
+  }
+  function requestEliminarCabina(c: Cabina) {
+    setConfirmCabina({ type: 'eliminar', cabina: c });
+  }
+
+  function confirmTitleCabina() {
+    if (!confirmCabina) return '';
+    switch (confirmCabina.type) {
+      case 'desactivar': return 'Desactivar cabina';
+      case 'activar': return 'Activar cabina';
+      case 'eliminar': return 'Eliminar cabina';
+    }
+  }
+  function confirmMessageCabina() {
+    if (!confirmCabina) return '';
+    const n = confirmCabina.cabina.nombre;
+    switch (confirmCabina.type) {
+      case 'desactivar':
+        return `¿Desactivar "${n}"? No se podrá elegir para nuevas citas mientras esté desactivada.`;
+      case 'activar':
+        return `¿Activar "${n}"?`;
+      case 'eliminar':
+        return `¿Eliminar "${n}"? Las citas que ya la usaron conservan el registro, pero no se podrá volver a elegir.`;
+    }
+  }
+  function confirmLabelCabina() {
+    if (!confirmCabina) return '';
+    switch (confirmCabina.type) {
+      case 'desactivar': return 'Desactivar';
+      case 'activar': return 'Activar';
+      case 'eliminar': return 'Eliminar';
+    }
+  }
+
+  async function executeConfirmCabina() {
+    if (!confirmCabina) return;
+    const c = confirmCabina.cabina;
+    switch (confirmCabina.type) {
+      case 'desactivar':
+        await handleActionCabina(
+          () => api.patch(`/cabinas/${c.id}`, { activa: false }),
+          `"${c.nombre}" desactivada.`,
+        );
+        break;
+      case 'activar':
+        await handleActionCabina(
+          () => api.patch(`/cabinas/${c.id}`, { activa: true }),
+          `"${c.nombre}" activada.`,
+        );
+        break;
+      case 'eliminar':
+        await handleActionCabina(
+          () => api.delete(`/cabinas/${c.id}`),
+          `"${c.nombre}" eliminada correctamente.`,
+        );
+        break;
+    }
+  }
+
   return (
-    <div className={styles.page} onClick={() => setMenuOpen(null)}>
+    <div className={styles.page} onClick={() => { setMenuOpen(null); setMenuOpenCabina(null); }}>
       {/* Header */}
       <div className={styles.header}>
         <div>
@@ -587,6 +877,80 @@ export function SucursalesPage() {
         )}
       </div>
 
+      {/* ── Cabinas ── */}
+      <div className={styles.header} style={{ marginTop: 8 }}>
+        <div>
+          <h2 className={styles.title} style={{ fontSize: 19 }}>Cabinas</h2>
+          <p className={styles.sub}>Salas o cubículos privados que algunos servicios requieren</p>
+        </div>
+        {canWrite && (
+          <button
+            type="button"
+            className={styles.btnNew}
+            disabled={sucursales.length === 0}
+            title={sucursales.length === 0 ? 'Crea primero una sucursal' : undefined}
+            onClick={() => setModalCreateCabina(true)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Nueva cabina
+          </button>
+        )}
+      </div>
+
+      <div className={styles.tableCard}>
+        {isLoadingCabinas ? (
+          <div className={styles.loadWrap}><div className={styles.spinner} /></div>
+        ) : cabinas.length === 0 ? (
+          <div className={styles.emptyMsg}>
+            No hay cabinas registradas. Solo hacen falta si algún servicio del Catálogo tiene marcado "Requiere cabina".
+          </div>
+        ) : (
+          <>
+            {/* Desktop */}
+            <table className={`${styles.table} ${styles.tableDesktop}`}>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Sucursal</th>
+                  <th>Estado</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {cabinas.map((c) => (
+                  <CabinaRow
+                    key={c.id}
+                    c={c}
+                    canWrite={canWrite}
+                    menuOpen={menuOpenCabina === c.id}
+                    onMenuToggle={() => setMenuOpenCabina((prev) => (prev === c.id ? null : c.id))}
+                    onEdit={() => { setEditCabina(c); setMenuOpenCabina(null); }}
+                    onToggleActiva={() => { requestToggleActivaCabina(c); setMenuOpenCabina(null); }}
+                    onEliminar={() => { requestEliminarCabina(c); setMenuOpenCabina(null); }}
+                  />
+                ))}
+              </tbody>
+            </table>
+
+            {/* Mobile */}
+            <div className={styles.mobileCards}>
+              {cabinas.map((c) => (
+                <MobileCabinaCard
+                  key={c.id}
+                  c={c}
+                  canWrite={canWrite}
+                  onEdit={() => setEditCabina(c)}
+                  onToggleActiva={() => requestToggleActivaCabina(c)}
+                  onEliminar={() => requestEliminarCabina(c)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Modal crear / editar */}
       {(modalCreate || editSucursal) && (
         <SucursalModal
@@ -611,6 +975,33 @@ export function SucursalesPage() {
           loading={actionLoading}
           onConfirm={executeConfirm}
           onClose={() => setConfirm(null)}
+        />
+      )}
+
+      {/* Modal crear / editar cabina */}
+      {(modalCreateCabina || editCabina) && (
+        <CabinaModal
+          data={editCabina ?? undefined}
+          sucursales={sucursales}
+          onClose={() => { setModalCreateCabina(false); setEditCabina(null); }}
+          onSuccess={() => {
+            showToast(editCabina ? 'Cabina actualizada.' : 'Cabina creada.');
+            setModalCreateCabina(false);
+            setEditCabina(null);
+          }}
+        />
+      )}
+
+      {/* Modal de confirmación (cabina) */}
+      {confirmCabina && (
+        <ConfirmModal
+          title={confirmTitleCabina()}
+          message={confirmMessageCabina()}
+          confirmLabel={confirmLabelCabina()}
+          danger={confirmCabina.type === 'eliminar'}
+          loading={actionLoading}
+          onConfirm={executeConfirmCabina}
+          onClose={() => setConfirmCabina(null)}
         />
       )}
 
