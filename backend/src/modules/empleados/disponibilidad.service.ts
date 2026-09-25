@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { CitaStatus } from '@prisma/client';
+import { diaSemanaRD, rangoDiaRD } from '../../core/common/fecha-rd.util';
 
 export interface Intervalo {
   inicio: string; // "HH:mm"
@@ -44,7 +45,7 @@ export class DisponibilidadService {
     });
     if (!empleado) throw new NotFoundException('Empleado no encontrado');
 
-    const diaSemana = new Date(`${fecha}T00:00:00`).getDay(); // 0=dom..6=sab
+    const diaSemana = diaSemanaRD(fecha); // 0=dom..6=sab
 
     // 1. Horario laboral del día
     const horario = await this.prisma.empleadoHorario.findFirst({
@@ -78,8 +79,7 @@ export class DisponibilidadService {
     const jornadaFin = duenoSinHorario ? 23 * 60 + 59 : this.toMin(horario!.horaFin);
 
     // 2. Rango del día en timestamps para consultar citas y bloqueos
-    const dayStart = new Date(`${fecha}T00:00:00`);
-    const dayEnd = new Date(`${fecha}T23:59:59.999`);
+    const { inicio: dayStart, fin: dayEnd } = rangoDiaRD(fecha);
 
     // 3. Citas activas (no canceladas ni no-show)
     const citas = await this.prisma.db.cita.findMany({

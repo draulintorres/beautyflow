@@ -3,6 +3,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { NotificationService } from './notification.service';
 import { UpsertPlantillaDto, PLANTILLAS_DEFECTO } from './dto/notificacion.dto';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
+import { fechaHoyRD, rangoDiaRD } from '../../core/common/fecha-rd.util';
 import {
   NotificacionEvento,
   CanalNotificacion,
@@ -69,12 +70,9 @@ export class NotificacionesJobsService {
 
   /** Recordatorio 24h: citas de mañana, estado activo. */
   async recordatorios24h(): Promise<{ enviados: number }> {
-    const manana = new Date();
-    manana.setDate(manana.getDate() + 1);
-    const ini = new Date(manana);
-    ini.setHours(0, 0, 0, 0);
-    const fin = new Date(manana);
-    fin.setHours(23, 59, 59, 999);
+    const mananaDate = new Date(`${fechaHoyRD()}T00:00:00.000Z`);
+    mananaDate.setUTCDate(mananaDate.getUTCDate() + 1);
+    const { inicio: ini, fin } = rangoDiaRD(mananaDate.toISOString().slice(0, 10));
 
     const citas = await this.prisma.db.cita.findMany({
       where: {

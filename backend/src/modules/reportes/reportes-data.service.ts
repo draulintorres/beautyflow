@@ -12,6 +12,7 @@ import {
 import { ENUM_TO_ESTADO_ES } from '../agenda/dto/cita.dto';
 import { tenantContext, getEmpresaId } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
+import { fechaHoyRD, rangoDiaRD } from '../../core/common/fecha-rd.util';
 
 @Injectable()
 export class ReportesDataService {
@@ -670,9 +671,8 @@ export class ReportesDataService {
 
   // ---------- AGENDA DIARIA ----------
   async agendaDiaria(q: ReporteQueryDto): Promise<ReporteTabular> {
-    const fecha = q.desde ?? new Date().toISOString().slice(0, 10);
-    const dayStart = new Date(`${fecha}T00:00:00`);
-    const dayEnd = new Date(`${fecha}T23:59:59.999`);
+    const fecha = q.desde ?? fechaHoyRD();
+    const { inicio: dayStart, fin: dayEnd } = rangoDiaRD(fecha);
     const sucursalId = await this.sucursalEfectiva(q);
 
     const citas = await this.prisma.db.cita.findMany({

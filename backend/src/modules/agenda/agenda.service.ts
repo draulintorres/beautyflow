@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { DisponibilidadService } from '../empleados/disponibilidad.service';
+import { rangoDiaRD } from '../../core/common/fecha-rd.util';
 import {
   CreateCitaDto,
   RescheduleCitaDto,
@@ -242,8 +243,7 @@ export class AgendaService {
       ? inquilino.empleadoId!
       : empleadoIdQuery;
 
-    const dayStart = new Date(`${fecha}T00:00:00`);
-    const dayEnd = new Date(`${fecha}T23:59:59.999`);
+    const { inicio: dayStart, fin: dayEnd } = rangoDiaRD(fecha);
 
     // Aislamiento por sucursal: un usuario no-OWNER asignado a una sucursal
     // solo ve las citas de esa sucursal. El OWNER puede pasar `sucursalId`
@@ -309,8 +309,7 @@ export class AgendaService {
    *   propio empleadoId.
    */
   async ingresoHoy(fecha: string): Promise<number> {
-    const dayStart = new Date(`${fecha}T00:00:00`);
-    const dayEnd = new Date(`${fecha}T23:59:59.999`);
+    const { inicio: dayStart, fin: dayEnd } = rangoDiaRD(fecha);
 
     // Aislamiento por sucursal: si el usuario está limitado a una sucursal,
     // "Ingreso de hoy" cuenta solo las ventas de esa sucursal.

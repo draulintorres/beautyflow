@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
+import { fechaHoyRD, rangoDiaRD } from '../../core/common/fecha-rd.util';
 import {
   VentaStatus,
   CitaStatus,
@@ -334,10 +335,10 @@ export class DashboardService {
     } else {
       // Por defecto ("Este año" / sin selector): ventana móvil de los
       // últimos 12 meses, comportamiento de siempre.
-      desde = new Date();
-      desde.setMonth(desde.getMonth() - 11);
-      desde.setDate(1);
-      desde.setHours(0, 0, 0, 0);
+      const base = new Date();
+      base.setMonth(base.getMonth() - 11);
+      const fechaDesde = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-01`;
+      desde = rangoDiaRD(fechaDesde).inicio;
     }
 
     const ventas = await this.prisma.db.venta.findMany({
@@ -454,8 +455,10 @@ export class DashboardService {
 
   /** Flujo de caja: entradas (pagos) por día en los últimos 30 días. */
   private async flujoCajaUltimos30Dias(sucursalId: string | null) {
-    const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    desde.setHours(0, 0, 0, 0);
+    const hace30DiasFecha = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const desde = rangoDiaRD(hace30DiasFecha).inicio;
 
     const pagos = await this.prisma.db.pago.findMany({
       where: {
@@ -653,13 +656,12 @@ export class DashboardService {
   }
 
   private rangos() {
-    const ahora = new Date();
-    const inicioHoy = new Date(ahora);
-    inicioHoy.setHours(0, 0, 0, 0);
-    const finHoy = new Date(ahora);
-    finHoy.setHours(23, 59, 59, 999);
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    const hace30Dias = new Date(ahora.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const hoy = fechaHoyRD();
+    const { inicio: inicioHoy, fin: finHoy } = rangoDiaRD(hoy);
+    const [anio, mes] = hoy.split('-').map(Number);
+    const primerDiaMes = `${anio}-${String(mes).padStart(2, '0')}-01`;
+    const inicioMes = rangoDiaRD(primerDiaMes).inicio;
+    const hace30Dias = new Date(inicioHoy.getTime() - 30 * 24 * 60 * 60 * 1000);
     return { inicioHoy, finHoy, inicioMes, hace30Dias };
   }
 
