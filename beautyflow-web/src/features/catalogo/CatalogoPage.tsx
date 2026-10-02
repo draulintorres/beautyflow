@@ -304,7 +304,13 @@ function ServicioModal({
                 rows={2} maxLength={500} placeholder="Descripción opcional" />
             </L>
             <div className={styles.checkRow}>
-              <label><input type="checkbox" checked={form.requiereCabina} onChange={e => f('requiereCabina', e.target.checked)} />Requiere cabina</label>
+              <div className={styles.checkCol}>
+                <label><input type="checkbox" checked={form.requiereCabina} onChange={e => f('requiereCabina', e.target.checked)} />Requiere cabina</label>
+                <span className={styles.fieldHint}>
+                  Márcalo solo si este servicio necesita reservar una sala o silla específica.
+                  Sin marcar, se agenda sin esa restricción — ideal para servicios a domicilio.
+                </span>
+              </div>
               <label><input type="checkbox" checked={form.activo} onChange={e => f('activo', e.target.checked)} />Activo</label>
             </div>
           </div>
