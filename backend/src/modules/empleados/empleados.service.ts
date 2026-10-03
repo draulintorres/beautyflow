@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { ComisionBase, ModeloPago } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import {
   CreateEmpleadoDto,
@@ -20,17 +21,24 @@ import { getEmpresaId, getCurrentUser } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
 import { LimitsService } from '../superadmin/limits.service';
 import { AuditService } from '../../core/audit/audit.service';
+import { EmailService } from '../../core/email/email.service';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
 @Injectable()
 export class EmpleadosService {
+  private readonly frontendUrl: string;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly limits: LimitsService,
     private readonly sucursalScope: SucursalScopeService,
     private readonly audit: AuditService,
-  ) {}
+    private readonly email: EmailService,
+    private readonly config: ConfigService,
+  ) {
+    this.frontendUrl = this.config.getOrThrow('FRONTEND_URL').replace(/\/+$/, '');
+  }
 
   // ---------- CRUD ----------
   async findAll() {
@@ -469,6 +477,8 @@ export class EmpleadosService {
       return { newUsuario };
     });
 
+    await this.enviarCorreoAcceso(newUsuario.nombre, newUsuario.email);
+
     return {
       usuarioId: newUsuario.id,
       email: newUsuario.email,
@@ -476,6 +486,38 @@ export class EmpleadosService {
       rolNombre: (newUsuario.rol as any).nombre,
       passwordTemporal: tempPassword,
     };
+  }
+
+  /**
+   * Correo de acceso para un empleado al que se le da acceso al sistema —
+   * mismo patrón que el correo de bienvenida del dueño de una empresa
+   * nueva (superadmin.service.ts) y que usuarios.service.ts#create(): se
+   * espera (no fire-and-forget), sin incluir la contraseña temporal (se
+   * comunica aparte), y EmailService.enviar() nunca relanza el error.
+   */
+  private async enviarCorreoAcceso(nombre: string, email: string): Promise<void> {
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: getEmpresaId() },
+      select: { nombre: true, slug: true },
+    });
+    if (!empresa) return;
+
+    const loginUrl = `${this.frontendUrl}/login`;
+    const slugSinGuiones = empresa.slug.replace(/-/g, '');
+    await this.email.enviar(
+      email,
+      `Tu acceso a ${empresa.nombre} en Estixa`,
+      `
+        <p>¡Hola${nombre ? ` ${nombre}` : ''}!</p>
+        <p>Ya tenés acceso al sistema de <b>${empresa.nombre}</b> en Estixa.</p>
+        <p>Iniciá sesión desde <a href="${loginUrl}">${loginUrl}</a> con estos datos:</p>
+        <p>
+          Empresa: <b>${slugSinGuiones}</b><br>
+          Correo: <b>${email}</b>
+        </p>
+        <p>La primera vez que entres te vamos a pedir crear tu propia contraseña.</p>
+      `,
+    );
   }
 
   async quitarAcceso(id: string) {

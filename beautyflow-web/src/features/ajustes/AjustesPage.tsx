@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth';
 import { useThemeStore } from '../../store/theme';
+import { fmtTelefono } from '../../lib/format';
 import {
   activarHuella,
   adivinarNombreDispositivo,
@@ -367,8 +368,8 @@ export function AjustesPage() {
             <input
               id="ajTelefono"
               value={form.telefono}
-              onChange={(e) => set('telefono', e.target.value)}
-              maxLength={30}
+              onChange={(e) => set('telefono', fmtTelefono(e.target.value))}
+              maxLength={12}
             />
           </div>
           <div className={`${styles.formField} ${styles.fieldFull}`}>

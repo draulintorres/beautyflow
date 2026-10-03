@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth';
-import { initiales } from '../../lib/format';
+import { initiales, fmtTelefono } from '../../lib/format';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import styles from './EquipoPage.module.css';
 
@@ -1167,9 +1167,9 @@ function IntegranteDrawer({
                   <label>Teléfono</label>
                   <input
                     value={form.telefono}
-                    onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))}
+                    onChange={e => setForm(f => ({ ...f, telefono: fmtTelefono(e.target.value) }))}
                     placeholder="809-000-0000"
-                    maxLength={30}
+                    maxLength={12}
                   />
                 </div>
                 <div className={`${styles.formField} ${styles.fieldFull}`}>

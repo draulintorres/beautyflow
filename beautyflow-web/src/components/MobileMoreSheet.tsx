@@ -147,20 +147,33 @@ export function MobileMoreSheet({ open, onClose }: MobileMoreSheetProps) {
 
   if (!open) return null;
 
+  const closeIcon = (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  );
+
   if (showNotif) {
     return (
       <>
         <div className={styles.backdrop} onClick={handleClose} />
         <div className={styles.sheet}>
-          <div className={styles.handle} />
-          <div className={styles.notifHeader}>
-            <button className={styles.backBtn} onClick={() => setShowNotif(false)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
+          <div className={styles.sheetHeader}>
+            <div className={styles.handle} />
+            <button className={styles.closeBtn} onClick={handleClose} aria-label="Cerrar">
+              {closeIcon}
             </button>
           </div>
-          <NotificacionesPanel onNavigated={handleClose} />
+          <div className={styles.sheetBody}>
+            <div className={styles.notifHeader}>
+              <button className={styles.backBtn} onClick={() => setShowNotif(false)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+            </div>
+            <NotificacionesPanel onNavigated={handleClose} />
+          </div>
         </div>
       </>
     );
@@ -172,85 +185,92 @@ export function MobileMoreSheet({ open, onClose }: MobileMoreSheetProps) {
     <>
       <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.sheet}>
-        <div className={styles.handle} />
-
-        <div className={styles.userRow}>
-          <div className={styles.avatar}>
-            {user?.nombre ? initiales(user.nombre) : 'U'}
-          </div>
-          <div className={styles.userInfo}>
-            <div className={styles.userName}>{user?.nombre}</div>
-            <div className={styles.userRole}>{empresa?.nombre}</div>
-          </div>
-        </div>
-
-        {/* Tema claro/oscuro: preferencia personal, universal — visible para
-            cualquier rol, sin importar los módulos que tenga (a diferencia
-            de la sección "Módulos" de abajo). */}
-        <div className={styles.section}>
-          <button className={styles.item} onClick={toggleTheme}>
-            <span className={styles.itemIcon}>
-              {theme === 'dark' ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.5 14.3A8.5 8.5 0 019.7 3.5a8.5 8.5 0 1010.8 10.8z" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="4.5" />
-                  <path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" />
-                </svg>
-              )}
-            </span>
-            <span className={styles.itemLabel}>Apariencia</span>
-            <span className={styles.themeState}>{theme === 'dark' ? 'Oscuro' : 'Claro'}</span>
+        <div className={styles.sheetHeader}>
+          <div className={styles.handle} />
+          <button className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
+            {closeIcon}
           </button>
         </div>
 
-        <div className={styles.section}>
-          <button className={styles.item} onClick={() => setShowNotif(true)}>
-            <span className={styles.itemIcon}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 01-3.46 0" />
-              </svg>
-            </span>
-            <span className={styles.itemLabel}>Notificaciones</span>
-            {noLeidas > 0 && (
-              <span className={styles.notifBadge}>{noLeidas > 9 ? '9+' : noLeidas}</span>
-            )}
-            <svg className={styles.chevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </button>
-        </div>
+        <div className={styles.sheetBody}>
+          <div className={styles.userRow}>
+            <div className={styles.avatar}>
+              {user?.nombre ? initiales(user.nombre) : 'U'}
+            </div>
+            <div className={styles.userInfo}>
+              <div className={styles.userName}>{user?.nombre}</div>
+              <div className={styles.userRole}>{empresa?.nombre}</div>
+            </div>
+          </div>
 
-        {visibles.length > 0 && (
+          {/* Tema claro/oscuro: preferencia personal, universal — visible para
+              cualquier rol, sin importar los módulos que tenga (a diferencia
+              de la sección "Módulos" de abajo). */}
           <div className={styles.section}>
-            <div className={styles.sectionLabel}>Módulos</div>
-            {visibles.map((s) => (
-              <button key={s.path} className={styles.item} onClick={() => go(s.path)}>
-                <span className={styles.itemIcon}>{s.icon}</span>
-                <span className={styles.itemLabel}>{s.label}</span>
-                <svg className={styles.chevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                  <path d="M9 18l6-6-6-6"/>
-                </svg>
-              </button>
-            ))}
+            <button className={styles.item} onClick={toggleTheme}>
+              <span className={styles.itemIcon}>
+                {theme === 'dark' ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.5 14.3A8.5 8.5 0 019.7 3.5a8.5 8.5 0 1010.8 10.8z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="4.5" />
+                    <path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" />
+                  </svg>
+                )}
+              </span>
+              <span className={styles.itemLabel}>Apariencia</span>
+              <span className={styles.themeState}>{theme === 'dark' ? 'Oscuro' : 'Claro'}</span>
+            </button>
           </div>
-        )}
 
-        <div className={styles.section}>
-          <button
-            className={`${styles.item} ${styles.danger}`}
-            onClick={() => { logout(); onClose(); }}
-          >
-            <span className={styles.itemIcon}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+          <div className={styles.section}>
+            <button className={styles.item} onClick={() => setShowNotif(true)}>
+              <span className={styles.itemIcon}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 01-3.46 0" />
+                </svg>
+              </span>
+              <span className={styles.itemLabel}>Notificaciones</span>
+              {noLeidas > 0 && (
+                <span className={styles.notifBadge}>{noLeidas > 9 ? '9+' : noLeidas}</span>
+              )}
+              <svg className={styles.chevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <path d="M9 18l6-6-6-6" />
               </svg>
-            </span>
-            <span className={styles.itemLabel}>Cerrar sesión</span>
-          </button>
+            </button>
+          </div>
+
+          {visibles.length > 0 && (
+            <div className={styles.section}>
+              <div className={styles.sectionLabel}>Módulos</div>
+              {visibles.map((s) => (
+                <button key={s.path} className={styles.item} onClick={() => go(s.path)}>
+                  <span className={styles.itemIcon}>{s.icon}</span>
+                  <span className={styles.itemLabel}>{s.label}</span>
+                  <svg className={styles.chevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className={styles.section}>
+            <button
+              className={`${styles.item} ${styles.danger}`}
+              onClick={() => { logout(); onClose(); }}
+            >
+              <span className={styles.itemIcon}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+                </svg>
+              </span>
+              <span className={styles.itemLabel}>Cerrar sesión</span>
+            </button>
+          </div>
         </div>
       </div>
     </>

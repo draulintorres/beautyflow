@@ -132,6 +132,11 @@ export class SuperAdminService {
           verticales: dto.verticales ?? [],
           plan: plan.tipo,
           estado: EmpresaStatus.ACTIVE,
+          // El default del schema es 18% (contribuyente DGII típico), pero
+          // toda empresa nueva debe arrancar con el ITBIS apagado — el
+          // dueño lo activa manualmente desde Ajustes si de verdad factura
+          // con impuesto.
+          itbisPct: 0,
         },
       });
 

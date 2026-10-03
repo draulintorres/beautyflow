@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, fmtTelefono } from '../../lib/format';
 import styles from './InventarioMobile.module.css';
 
 interface Producto {
@@ -567,7 +567,7 @@ function ProveedorFormMobile({ proveedor, onClose, onSaved }: { proveedor: Prove
           </div>
           <div className={styles.inWrap}>
             <div className={styles.inLbl}>Teléfono</div>
-            <input className={styles.inInput} value={f.telefono} onChange={e => set('telefono', e.target.value)} />
+            <input className={styles.inInput} value={f.telefono} onChange={e => set('telefono', fmtTelefono(e.target.value))} maxLength={12} />
           </div>
           <div className={styles.inWrap}>
             <div className={styles.inLbl}>Email</div>

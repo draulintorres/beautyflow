@@ -127,7 +127,7 @@ export function ClientesPage() {
                   <div className={styles.cav}>{initiales(c.nombre)}</div>
                   <div className={styles.cinfo}>
                     <b>{c.nombre}{c.apellido ? ` ${c.apellido}` : ''}</b>
-                    <small>{c.telefono ?? 'Sin teléfono'}</small>
+                    {(c.telefono || c.whatsapp) && <small>{c.telefono ?? c.whatsapp}</small>}
                   </div>
                   <div className={styles.ctags}>
                     {c.etiquetas.slice(0, 1).map(et => (

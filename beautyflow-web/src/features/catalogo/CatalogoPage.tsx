@@ -227,13 +227,20 @@ function ServicioModal({
   mode: 'crear' | 'editar'; data?: Servicio;
   categorias: Categoria[]; onClose: () => void; onSaved: () => void;
 }) {
+  // Al crear un servicio nuevo (no al editar uno existente), precargar
+  // "Tipo de negocio" con el vertical ya configurado en la empresa —
+  // sigue siendo editable por si hace falta uno distinto para ese servicio
+  // puntual. Si la empresa tiene varios verticales activos, se usa el
+  // primero como default (no hay forma de saber cuál preferir).
+  const empresaVertical = useAuthStore(s => s.empresa?.verticales?.[0]);
+
   const [form, setForm] = useState({
     nombre:       data?.nombre ?? '',
     categoriaId:  data?.categoriaId ?? '',
-    vertical:     data?.vertical ?? '',
+    vertical:     data?.vertical ?? (mode === 'crear' ? empresaVertical ?? '' : ''),
     descripcion:  data?.descripcion ?? '',
     precio:       data ? num(data.precio) : ('' as number | ''),
-    duracionMin:  data?.duracionMin ?? 30,
+    duracionMin:  (data?.duracionMin ?? 30) as number | '',
     comisionPct:  data?.comisionPct != null ? num(data.comisionPct) : ('' as number | ''),
     requiereCabina: data?.requiereCabina ?? false,
     activo:       data?.activo ?? true,
@@ -297,7 +304,7 @@ function ServicioModal({
             </L>
             <L label="Duración (min) *">
               <input type="number" min={1} max={1440} step={1} value={form.duracionMin}
-                onChange={e => f('duracionMin', Number(e.target.value))} />
+                onChange={e => f('duracionMin', e.target.value === '' ? '' : Number(e.target.value))} />
             </L>
             <L label="Descripción" full>
               <textarea value={form.descripcion} onChange={e => f('descripcion', e.target.value)}

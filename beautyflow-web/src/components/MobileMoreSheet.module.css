@@ -16,17 +16,39 @@
     bottom: 0;
     left: 0;
     right: 0;
+    /* Tope de alto + scroll propio: en viewports chicos (iPhone SE, Android
+       chico) el contenido (user row + Apariencia + Notificaciones + todos
+       los módulos + Cerrar sesión) no entraba completo en pantalla, y como
+       no había ningún botón de cerrar, quedaba sin forma de regresar más
+       que el backdrop — que también podía quedar tapado por el propio
+       contenido desbordado. El header con el botón de cerrar queda FUERA
+       de esta zona de scroll (ver .sheetBody), así que siempre es visible. */
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
     background: var(--surface);
     border-top: 1px solid var(--line);
     border-radius: 20px 20px 0 0;
     z-index: 301;
-    padding: 12px 0 calc(24px + env(safe-area-inset-bottom, 0px));
     animation: slideUp 0.25s ease;
   }
 
   @keyframes slideUp {
     from { transform: translateY(100%); opacity: 0; }
     to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  .sheetHeader {
+    position: relative;
+    flex-shrink: 0;
+    padding: 12px 0 0;
+  }
+
+  .sheetBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
   .handle {
@@ -36,6 +58,23 @@
     background: var(--line);
     margin: 0 auto 16px;
   }
+
+  .closeBtn {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .closeBtn:hover { color: var(--text); }
+  .closeBtn svg { width: 16px; height: 16px; }
 
   .userRow {
     display: flex;

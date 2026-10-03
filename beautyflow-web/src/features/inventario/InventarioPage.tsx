@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, fmtTelefono } from '../../lib/format';
 import styles from './InventarioPage.module.css';
 import { InventarioMobile } from './InventarioMobile';
 
@@ -647,7 +647,7 @@ function ProveedorModal({ proveedor, onClose, onSaved }: { proveedor: Proveedor 
           <div className={styles.formGrid}>
             <L label="Nombre *"><input value={form.nombre} onChange={e => set('nombre', e.target.value)} /></L>
             <L label="RNC"><input value={form.rnc} onChange={e => set('rnc', e.target.value)} /></L>
-            <L label="Teléfono"><input value={form.telefono} onChange={e => set('telefono', e.target.value)} /></L>
+            <L label="Teléfono"><input value={form.telefono} onChange={e => set('telefono', fmtTelefono(e.target.value))} maxLength={12} /></L>
             <L label="Email"><input value={form.email} onChange={e => set('email', e.target.value)} /></L>
             <L label="Persona de contacto"><input value={form.contacto} onChange={e => set('contacto', e.target.value)} /></L>
             <L label="Dirección" full><input value={form.direccion} onChange={e => set('direccion', e.target.value)} /></L>

@@ -108,7 +108,9 @@ export function ClientesMobile() {
               <div className={styles.avatar}>{ini(c.nombre, c.apellido)}</div>
               <div className={styles.cardInfo}>
                 <div className={styles.cardNom}>{c.nombre}{c.apellido ? ` ${c.apellido}` : ''}</div>
-                <div className={styles.cardTel}>{c.telefono ?? 'Sin teléfono'}</div>
+                {(c.telefono || c.whatsapp) && (
+                  <div className={styles.cardTel}>{c.telefono ?? c.whatsapp}</div>
+                )}
               </div>
               {c.etiquetas && c.etiquetas[0] && (
                 <span className={`${styles.badge} ${styles[ET_CLS[c.etiquetas[0]] ?? 'etNuevo']}`}>

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth';
+import { fmtTelefono } from '../../lib/format';
 import styles from './SucursalesPage.module.css';
 
 // ── Types ──────────────────────────────────────────────
@@ -151,9 +152,9 @@ function SucursalModal({
               <label>Teléfono</label>
               <input
                 value={form.telefono}
-                onChange={(e) => set('telefono', e.target.value)}
+                onChange={(e) => set('telefono', fmtTelefono(e.target.value))}
                 placeholder="809-000-0000"
-                maxLength={30}
+                maxLength={12}
               />
             </div>
           </div>
