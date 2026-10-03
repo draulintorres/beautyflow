@@ -59,13 +59,17 @@ export class ClientesController {
   }
 
   @Post()
-  @Roles('OWNER', 'ADMIN', 'MANAGER', 'RECEPCION', 'CASHIER')
+  // ALQUILER (Inquilino) incluido a propósito: permisos.matrix.ts ya le da
+  // el módulo 'clientes' ("clientes sigue compartido por decisión", ver
+  // Fase B2 Pieza 3) — sin esto, el formulario de Clientes fallaba para
+  // un inquilino con un 403 genérico (confirmado en vivo esta ronda).
+  @Roles('OWNER', 'ADMIN', 'MANAGER', 'RECEPCION', 'CASHIER', 'ALQUILER')
   create(@Body() dto: CreateClienteDto) {
     return this.clientes.create(dto);
   }
 
   @Patch(':id')
-  @Roles('OWNER', 'ADMIN', 'MANAGER', 'RECEPCION', 'CASHIER')
+  @Roles('OWNER', 'ADMIN', 'MANAGER', 'RECEPCION', 'CASHIER', 'ALQUILER')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateClienteDto,

@@ -18,6 +18,11 @@ interface Cliente {
 interface CitaCliente { id: string; fecha: string; servicios: string[]; empleado: string; estado: string; total: number; }
 interface CompraCliente { id: string; factura: string; fecha: string; total: number; balancePendiente: number; estado: string; }
 interface PagoHistorial { id: string; metodo: string; monto: number; referencia: string | null; esAbonoDeuda: boolean; fecha: string | null; }
+
+const errMsg = (e: unknown) => {
+  const msg = (e as any)?.response?.data?.message;
+  return msg ? (Array.isArray(msg) ? msg.join(' · ') : String(msg)) : 'No se pudo guardar. Verifica los datos.';
+};
 interface Balance { limiteCredito: number; balancePendiente: number; disponible: number; permiteFiao: boolean; }
 
 const ETIQUETAS = ['NUEVO', 'FRECUENTE', 'VIP', 'MOROSO', 'CUMPLEANOS'] as const;
@@ -342,7 +347,7 @@ function ClienteModal({ cliente, onClose, onSaved }: {
       return api.post('/clientes', body).then(r => r.data);
     },
     onSuccess: (c) => onSaved(c),
-    onError: () => setErr('No se pudo guardar. Verifica los datos.'),
+    onError: (e) => setErr(errMsg(e)),
   });
 
   return (

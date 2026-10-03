@@ -15,6 +15,11 @@ interface Cliente {
   etiquetas?: string[];
 }
 
+const errMsg = (e: unknown) => {
+  const msg = (e as any)?.response?.data?.message;
+  return msg ? (Array.isArray(msg) ? msg.join(' · ') : String(msg)) : 'No se pudo guardar el cliente.';
+};
+
 const ETIQUETAS = ['NUEVO', 'FRECUENTE', 'VIP', 'MOROSO', 'CUMPLEANOS'] as const;
 const ET_LBL: Record<string, string> = {
   NUEVO: 'Nuevo', FRECUENTE: 'Frecuente', VIP: 'VIP', MOROSO: 'Moroso', CUMPLEANOS: 'Cumpleaños',
@@ -361,7 +366,7 @@ function ClienteForm({
         : api.post('/clientes', body);
     },
     onSuccess: () => onSaved(),
-    onError: () => setErr('No se pudo guardar el cliente.'),
+    onError: (e) => setErr(errMsg(e)),
   });
 
   return (
