@@ -108,6 +108,40 @@ export class SuperAdminService {
     }));
   }
 
+  /**
+   * Diagnóstico puntual (round "un solo camino para crear acceso"):
+   * usuarios reales, activos, no-OWNER, sin ningún Empleado vinculado —
+   * el rastro de haber sido creados por el camino viejo de "Usuarios >
+   * Nuevo usuario" (que nunca creaba el Empleado). Solo lectura.
+   */
+  async usuariosHuerfanos(empresaId: string) {
+    const usuarios = await this.prisma.usuario.findMany({
+      where: {
+        empresaId,
+        deletedAt: null,
+        activo: true,
+        rol: { roleKey: { not: RoleKey.OWNER } },
+        empleado: null,
+      },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        createdAt: true,
+        rol: { select: { roleKey: true, nombre: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    return usuarios.map((u) => ({
+      id: u.id,
+      nombre: u.nombre,
+      email: u.email,
+      rol: u.rol.roleKey,
+      rolNombre: u.rol.nombre,
+      createdAt: u.createdAt,
+    }));
+  }
+
   async crearEmpresa(dto: CrearEmpresaDto) {
     // slug único
     const existe = await this.prisma.empresa.findUnique({

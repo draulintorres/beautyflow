@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Patch,
   Param,
   Body,
@@ -10,11 +9,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
-import {
-  CreateUsuarioDto,
-  UpdateUsuarioDto,
-  ResetUsuarioPasswordDto,
-} from './dto/usuario.dto';
+import { UpdateUsuarioDto, ResetUsuarioPasswordDto } from './dto/usuario.dto';
 import { Roles, Modulos } from '../../core/auth/decorators/auth.decorators';
 
 @Controller('usuarios')
@@ -36,11 +31,6 @@ export class UsuariosController {
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usuarios.findOne(id);
-  }
-
-  @Post()
-  create(@Body() dto: CreateUsuarioDto) {
-    return this.usuarios.create(dto);
   }
 
   @Patch(':id')

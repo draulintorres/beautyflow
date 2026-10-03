@@ -2,35 +2,20 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ConflictException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import {
-  CreateUsuarioDto,
-  UpdateUsuarioDto,
-  ResetUsuarioPasswordDto,
-} from './dto/usuario.dto';
-import { getCurrentUser, getEmpresaId } from '../../core/tenant/tenant-context';
-import { LimitsService } from '../superadmin/limits.service';
+import { UpdateUsuarioDto, ResetUsuarioPasswordDto } from './dto/usuario.dto';
+import { getCurrentUser } from '../../core/tenant/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
-import { EmailService } from '../../core/email/email.service';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
 @Injectable()
 export class UsuariosService {
-  private readonly frontendUrl: string;
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly limits: LimitsService,
     private readonly audit: AuditService,
-    private readonly email: EmailService,
-    private readonly config: ConfigService,
-  ) {
-    this.frontendUrl = this.config.getOrThrow('FRONTEND_URL').replace(/\/+$/, '');
-  }
+  ) {}
 
   async findAll() {
     const usuarios = await this.prisma.db.usuario.findMany({
@@ -47,92 +32,6 @@ export class UsuariosService {
     });
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
     return this.toResponse(usuario);
-  }
-
-  async create(dto: CreateUsuarioDto) {
-    // Validar límite del plan antes de crear
-    await this.limits.verificar('usuarios');
-
-    // El rol debe existir y pertenecer a la empresa (filtro de tenant aplica)
-    const rol = await this.prisma.db.rol.findFirst({
-      where: { id: dto.rolId },
-    });
-    if (!rol) throw new BadRequestException('Rol no válido');
-
-    // Email único por empresa
-    const existe = await this.prisma.db.usuario.findFirst({
-      where: { email: dto.email },
-    });
-    if (existe) {
-      throw new ConflictException('Ya existe un usuario con ese email en la empresa');
-    }
-
-    // Contraseña: la provista o una temporal con cambio obligatorio
-    const tempPassword = dto.password ?? this.generateTempPassword();
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
-    const debeChangePassword = !dto.password;
-
-    const usuario = await this.prisma.db.usuario.create({
-      data: {
-        nombre: dto.nombre,
-        email: dto.email,
-        telefono: dto.telefono,
-        rolId: dto.rolId,
-        passwordHash,
-        debeChangePassword,
-      } as any,
-      include: { rol: { select: { nombre: true, roleKey: true } } },
-    });
-
-    await this.audit.log({
-      modulo: 'USUARIOS',
-      entidad: 'Usuario',
-      entidadId: usuario.id,
-      accion: 'CREATE',
-      datosDespues: { nombre: usuario.nombre, email: usuario.email, rol: (usuario as any).rol?.roleKey },
-    });
-
-    await this.enviarCorreoAcceso(usuario.nombre, usuario.email);
-
-    return {
-      ...this.toResponse(usuario),
-      // Solo se devuelve la temporal si el sistema la generó
-      ...(debeChangePassword ? { passwordTemporal: tempPassword } : {}),
-    };
-  }
-
-  /**
-   * Correo de acceso para un usuario nuevo — mismo patrón que el correo de
-   * bienvenida del dueño de una empresa nueva (superadmin.service.ts):
-   * se espera (no fire-and-forget, para que un redeploy justo después de
-   * responder no corte el envío a medio hacer), sin incluir la contraseña
-   * temporal (se comunica aparte, ej. WhatsApp) y EmailService.enviar()
-   * nunca relanza el error, así que esperarlo no puede hacer fallar la
-   * creación del usuario.
-   */
-  private async enviarCorreoAcceso(nombre: string, email: string): Promise<void> {
-    const empresa = await this.prisma.empresa.findUnique({
-      where: { id: getEmpresaId() },
-      select: { nombre: true, slug: true },
-    });
-    if (!empresa) return;
-
-    const loginUrl = `${this.frontendUrl}/login`;
-    const slugSinGuiones = empresa.slug.replace(/-/g, '');
-    await this.email.enviar(
-      email,
-      `Tu acceso a ${empresa.nombre} en Estixa`,
-      `
-        <p>¡Hola${nombre ? ` ${nombre}` : ''}!</p>
-        <p>Ya tenés acceso al sistema de <b>${empresa.nombre}</b> en Estixa.</p>
-        <p>Iniciá sesión desde <a href="${loginUrl}">${loginUrl}</a> con estos datos:</p>
-        <p>
-          Empresa: <b>${slugSinGuiones}</b><br>
-          Correo: <b>${email}</b>
-        </p>
-        <p>La primera vez que entres te vamos a pedir crear tu propia contraseña.</p>
-      `,
-    );
   }
 
   async update(id: string, dto: UpdateUsuarioDto) {

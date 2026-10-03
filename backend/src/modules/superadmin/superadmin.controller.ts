@@ -62,6 +62,12 @@ export class SuperAdminController {
     return this.sa.crearEmpresa(dto);
   }
 
+  // Diagnóstico puntual — ver SuperAdminService#usuariosHuerfanos.
+  @Get('empresas/:id/usuarios-huerfanos')
+  usuariosHuerfanos(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sa.usuariosHuerfanos(id);
+  }
+
   @Patch('empresas/:id')
   editarEmpresa(
     @Param('id', ParseUUIDPipe) id: string,

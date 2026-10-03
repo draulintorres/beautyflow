@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth';
@@ -131,25 +132,27 @@ function ConfirmModal({
   );
 }
 
-// ── UsuarioModal (crear / editar) ──────────────────────
-function UsuarioModal({
+// ── EditarUsuarioModal ──────────────────────────────────
+// La creación de usuarios ya no vive acá — "Usuarios" solo administra
+// cuentas ya existentes. El único camino para dar acceso a alguien nuevo
+// es Equipo → "crear acceso", que crea primero el Empleado vinculado
+// (ver nota en UsuariosPage sobre por qué se quitó "Nuevo usuario").
+function EditarUsuarioModal({
   data, roles, currentUserId, currentRol, onClose, onSuccess,
 }: {
-  data?: Usuario;
+  data: Usuario;
   roles: Rol[];
   currentUserId: string;
   currentRol: string;
   onClose: () => void;
-  onSuccess: (tempPassword?: string) => void;
+  onSuccess: () => void;
 }) {
-  const isEdit = !!data;
-  const esPropioCambioRol = isEdit && data!.id === currentUserId;
+  const esPropioCambioRol = data.id === currentUserId;
 
   const [form, setForm] = useState({
-    nombre: data?.nombre ?? '',
-    email: data?.email ?? '',
-    telefono: data?.telefono ?? '',
-    rolId: data?.rolId ?? '',
+    nombre: data.nombre,
+    telefono: data.telefono ?? '',
+    rolId: data.rolId,
   });
   const [err, setErr] = useState('');
   const qc = useQueryClient();
@@ -160,27 +163,18 @@ function UsuarioModal({
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const isValid = form.nombre.trim() && (isEdit || (form.email.trim() && form.rolId));
+  const isValid = form.nombre.trim();
 
   const guardar = useMutation({
     mutationFn: () => {
-      if (isEdit) {
-        const patch: Record<string, unknown> = { nombre: form.nombre };
-        if (form.telefono !== (data!.telefono ?? '')) patch.telefono = form.telefono || undefined;
-        if (!esPropioCambioRol && form.rolId && form.rolId !== data!.rolId) patch.rolId = form.rolId;
-        return api.patch(`/usuarios/${data!.id}`, patch).then((r) => r.data);
-      }
-      return api.post('/usuarios', {
-        nombre: form.nombre,
-        email: form.email,
-        ...(form.telefono && { telefono: form.telefono }),
-        rolId: form.rolId,
-      }).then((r) => r.data);
+      const patch: Record<string, unknown> = { nombre: form.nombre };
+      if (form.telefono !== (data.telefono ?? '')) patch.telefono = form.telefono || undefined;
+      if (!esPropioCambioRol && form.rolId && form.rolId !== data.rolId) patch.rolId = form.rolId;
+      return api.patch(`/usuarios/${data.id}`, patch).then((r) => r.data);
     },
-    onSuccess: (res) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['usuarios'] });
-      qc.invalidateQueries({ queryKey: ['empresa-info'] });
-      onSuccess(res?.passwordTemporal);
+      onSuccess();
     },
     onError: (e) => setErr(errMsg(e)),
   });
@@ -189,7 +183,7 @@ function UsuarioModal({
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHead}>
-          <h3>{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</h3>
+          <h3>Editar usuario</h3>
           <button type="button" onClick={onClose}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
@@ -208,16 +202,13 @@ function UsuarioModal({
             </div>
 
             <div className={styles.formField}>
-              <label>Email {!isEdit && '*'}</label>
+              <label>Email</label>
               <input
-                value={form.email}
-                onChange={isEdit ? undefined : (e) => set('email', e.target.value)}
-                readOnly={isEdit}
-                className={isEdit ? styles.fieldReadonly : ''}
-                placeholder={isEdit ? '' : 'correo@ejemplo.com'}
-                type="email"
+                value={data.email}
+                readOnly
+                className={styles.fieldReadonly}
               />
-              {isEdit && <span className={styles.fieldHint}>El email no se puede cambiar</span>}
+              <span className={styles.fieldHint}>El email no se puede cambiar</span>
             </div>
 
             <div className={styles.formField}>
@@ -252,11 +243,6 @@ function UsuarioModal({
             </div>
           </div>
 
-          {!isEdit && (
-            <p className={styles.pwdNote}>
-              Se generará una contraseña temporal automáticamente. La verás una sola vez al crear al usuario.
-            </p>
-          )}
           {err && <div className={styles.modalErr}>{err}</div>}
         </div>
 
@@ -270,7 +256,7 @@ function UsuarioModal({
             onClick={() => guardar.mutate()}
             disabled={!isValid || guardar.isPending}
           >
-            {guardar.isPending ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear usuario'}
+            {guardar.isPending ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
       </div>
@@ -436,8 +422,8 @@ export function UsuariosPage() {
   const currentUserId = useAuthStore((s) => s.user?.id ?? '');
   const currentRol = useAuthStore((s) => s.user?.rol ?? '');
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
-  const [modalCreate, setModalCreate] = useState(false);
   const [editUser, setEditUser] = useState<Usuario | null>(null);
   const [tempPwd, setTempPwd] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ type: 'activar' | 'desactivar' | 'reset'; user: Usuario } | null>(null);
@@ -520,7 +506,10 @@ export function UsuariosPage() {
 
   return (
     <div className={styles.page} onClick={() => setMenuOpen(null)}>
-      {/* Header */}
+      {/* Header — dar acceso a alguien nuevo pasa siempre por Equipo, que
+          crea primero el Empleado vinculado; un usuario creado directo
+          acá (como antes) quedaba "huérfano" y no podía cobrar en el POS
+          hasta que alguien lo vinculara a mano desde otra pantalla. */}
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Usuarios</h1>
@@ -531,12 +520,12 @@ export function UsuariosPage() {
           className={styles.btnNew}
           disabled={limitReached}
           title={limitReached ? 'Has alcanzado el límite de usuarios de tu plan' : undefined}
-          onClick={() => setModalCreate(true)}
+          onClick={() => navigate('/equipo')}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Nuevo usuario
+          Crear acceso desde Equipo
         </button>
       </div>
 
@@ -621,19 +610,17 @@ export function UsuariosPage() {
         )}
       </div>
 
-      {/* Modal crear / editar */}
-      {(modalCreate || editUser) && (
-        <UsuarioModal
-          data={editUser ?? undefined}
+      {/* Modal editar */}
+      {editUser && (
+        <EditarUsuarioModal
+          data={editUser}
           roles={roles}
           currentUserId={currentUserId}
           currentRol={currentRol}
-          onClose={() => { setModalCreate(false); setEditUser(null); }}
-          onSuccess={(pwd) => {
-            setModalCreate(false);
+          onClose={() => setEditUser(null)}
+          onSuccess={() => {
             setEditUser(null);
-            showToast(editUser ? 'Usuario actualizado.' : 'Usuario creado.');
-            if (pwd) setTempPwd(pwd);
+            showToast('Usuario actualizado.');
           }}
         />
       )}
