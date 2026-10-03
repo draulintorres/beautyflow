@@ -119,6 +119,15 @@ export function PosPage() {
         const linea = lineas.find(l => l.tipo === 'SERVICIO' && l.empleadoId);
         return linea ? empleados.find(e => e.id === linea.empleadoId && e.modeloPago === 'ALQUILER') ?? null : null;
       })();
+  // Cualquier usuario logueado con su propio Empleado real (no el fantasma
+  // del dueño, esCuentaDueno) — él mismo es quien hizo el servicio, no
+  // tiene sentido pedirle elegir a otra persona. Superset de soyInquilino
+  // (todo Alquiler real cae acá también), pero SIN sus restricciones
+  // propias (sin productos, deuda al negocio) — esas siguen atadas solo a
+  // soyInquilino/inquilinoEnVenta, que no se tocan.
+  const miEmpleadoPropio = miEmpleado && !miEmpleado.esCuentaDueno ? miEmpleado : null;
+  // Empleado al que se autoasigna cada línea de servicio sin elegir nada.
+  const empleadoAutoAsignado = inquilinoEnVenta ?? miEmpleadoPropio;
 
   // Si hay un inquilino en la venta, la pestaña Productos ni existe —
   // fuerza servicios aunque `tab` haya quedado en PRODUCTOS de antes.
@@ -153,9 +162,10 @@ export function PosPage() {
         tipo, refId: item.id, nombre: item.nombre,
         precio: Number(item.precio),
         cantidad: 1,
-        // Si ya hay un inquilino en la venta (o el usuario logueado lo es),
-        // toda línea nueva es automáticamente suya — no hay nada que elegir.
-        empleadoId: tipo === 'SERVICIO' ? inquilinoEnVenta?.id : undefined,
+        // Si ya hay un inquilino en la venta, o el usuario logueado tiene
+        // su propio Empleado, toda línea nueva es automáticamente suya —
+        // no hay nada que elegir.
+        empleadoId: tipo === 'SERVICIO' ? empleadoAutoAsignado?.id : undefined,
       }];
     });
   }
@@ -187,13 +197,20 @@ export function PosPage() {
       const body: any = {
         clienteId: clienteId ?? undefined,
         citaId: citaIdActual ?? undefined,
-        lineas: lineas.map(l => ({
-          tipo: l.tipo,
-          servicioId: l.tipo === 'SERVICIO' ? l.refId : undefined,
-          productoId: l.tipo === 'PRODUCTO' ? l.refId : undefined,
-          ...(l.empleadoId ? { empleadoId: l.empleadoId } : {}),
-          cantidad: l.cantidad,
-        })),
+        lineas: lineas.map(l => {
+          // Red de seguridad: si el usuario logueado se autoasigna, toda
+          // línea de servicio debe llevar su empleadoId al cobrar, sin
+          // importar si quedó sin setear en el estado (ej. precargada
+          // desde una cita sin empleado asignado).
+          const empId = l.empleadoId ?? (l.tipo === 'SERVICIO' ? empleadoAutoAsignado?.id : undefined);
+          return {
+            tipo: l.tipo,
+            servicioId: l.tipo === 'SERVICIO' ? l.refId : undefined,
+            productoId: l.tipo === 'PRODUCTO' ? l.refId : undefined,
+            ...(empId ? { empleadoId: empId } : {}),
+            cantidad: l.cantidad,
+          };
+        }),
         descuentoGlobal: descuentoGlobal || undefined,
         aperturaCajaId: cajaEstado?.cajaAbierta?.aperturaId,
       };
@@ -400,11 +417,12 @@ export function PosPage() {
                       <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                   </div>
-                  {l.tipo === 'SERVICIO' && inquilinoEnVenta && l.empleadoId === inquilinoEnVenta.id ? (
-                    // Esta línea ya es del inquilino: no hay nada que
-                    // elegir, y no se puede reasignar a otro empleado.
-                    <div className={styles.empSelect}>Atendió: {inquilinoEnVenta.nombre}</div>
-                  ) : l.tipo === 'SERVICIO' && !inquilinoEnVenta && empleadosServicio.length > 0 && (
+                  {l.tipo === 'SERVICIO' && empleadoAutoAsignado && l.empleadoId === empleadoAutoAsignado.id ? (
+                    // Esta línea ya es del inquilino, o del propio usuario
+                    // logueado: no hay nada que elegir, y no se puede
+                    // reasignar a otro empleado.
+                    <div className={styles.empSelect}>Atendió: {empleadoAutoAsignado.nombre}</div>
+                  ) : l.tipo === 'SERVICIO' && !empleadoAutoAsignado && empleadosServicio.length > 0 && (
                     <select
                       className={`${styles.empSelect}${!l.empleadoId ? ` ${styles.empSelectWarn}` : ''}`}
                       value={l.empleadoId ?? ''}
@@ -509,10 +527,11 @@ export function PosPage() {
             disabled={!puedeConfirmar}
             onClick={() => {
               // Sin empleados reales que ofrecer (solo el dueño, o nadie
-              // todavía), no hay a quién "olvidar" seleccionar — se cobra
+              // todavía), o si el usuario logueado se autoasigna a sí
+              // mismo, no hay a quién "olvidar" seleccionar — se cobra
               // directo, sin el aviso.
               const sinEmp = lineas.filter(l => l.tipo === 'SERVICIO' && !l.empleadoId).map(l => l.nombre);
-              if (sinEmp.length > 0 && empleadosServicio.length > 0) { setWarnSinEmpleado(sinEmp); return; }
+              if (sinEmp.length > 0 && empleadosServicio.length > 0 && !empleadoAutoAsignado) { setWarnSinEmpleado(sinEmp); return; }
               crearVenta.mutate();
             }}
           >

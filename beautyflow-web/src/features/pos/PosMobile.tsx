@@ -14,7 +14,11 @@ interface Cliente {
   permiteFiao?: boolean; limiteCredito?: number; balancePendiente?: number;
   etiquetas?: string[];
 }
-interface Empleado { id: string; nombre: string; activo: boolean; participaAgenda: boolean; esCuentaDueno?: boolean; }
+interface Empleado {
+  id: string; nombre: string; activo: boolean; participaAgenda: boolean;
+  esCuentaDueno?: boolean;
+  usuario?: { id: string } | null;
+}
 interface MetodoPago { id: string; nombre: string; esEfectivo: boolean; activo: boolean; orden: number; }
 
 interface Linea {
@@ -86,6 +90,14 @@ export function PosMobile() {
     .filter(e => e.activo && e.participaAgenda && !e.esCuentaDueno)
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
+  // Mismo criterio que PosPage.tsx (escritorio): si el usuario logueado
+  // tiene su propio Empleado real (no el fantasma del dueño), él mismo es
+  // quien hizo el servicio — no tiene sentido pedirle elegir a otra
+  // persona en "¿Quién lo hizo?".
+  const authUser = useAuthStore(s => s.user);
+  const miEmpleado = empleados.find(e => e.usuario?.id === authUser?.id && !e.esCuentaDueno) ?? null;
+  const empleadoAutoAsignado = miEmpleado;
+
   const clienteSel = clientes.find(c => c.id === clienteId);
   const clientesFiltrados = clientes
     .filter(c => c.nombre.toLowerCase().includes(cliBusca.toLowerCase()))
@@ -99,7 +111,12 @@ export function PosMobile() {
   const productosFiltrados = productos.filter(p => p.nombre.toLowerCase().includes(busca.toLowerCase()));
 
   function addServicio(s: Servicio) {
-    setLineas(ls => [...ls, { key: `${s.id}-${Date.now()}`, tipo: 'SERVICIO', refId: s.id, nombre: s.nombre, precio: num(s.precio), cantidad: 1 }]);
+    setLineas(ls => [...ls, {
+      key: `${s.id}-${Date.now()}`, tipo: 'SERVICIO', refId: s.id, nombre: s.nombre, precio: num(s.precio), cantidad: 1,
+      // Si el usuario logueado tiene su propio Empleado, la línea nueva es
+      // automáticamente suya — no hay nada que elegir.
+      empleadoId: empleadoAutoAsignado?.id,
+    }]);
   }
   function addProducto(p: Producto) {
     if (!p.permiteVentaSinStock && p.existencia === 0) return;
@@ -131,12 +148,19 @@ export function PosMobile() {
     mutationFn: (payload: { pagos: Pago[]; permitirFiao: boolean }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: any = {
-        lineas: lineas.map(l => ({
-          tipo: l.tipo,
-          ...(l.tipo === 'SERVICIO' ? { servicioId: l.refId } : { productoId: l.refId }),
-          ...(l.empleadoId ? { empleadoId: l.empleadoId } : {}),
-          cantidad: l.cantidad,
-        })),
+        lineas: lineas.map(l => {
+          // Red de seguridad: si el usuario logueado se autoasigna, toda
+          // línea de servicio debe llevar su empleadoId al cobrar, sin
+          // importar si quedó sin setear en el estado (ej. precargada
+          // desde una cita sin empleado asignado).
+          const empId = l.empleadoId ?? (l.tipo === 'SERVICIO' ? empleadoAutoAsignado?.id : undefined);
+          return {
+            tipo: l.tipo,
+            ...(l.tipo === 'SERVICIO' ? { servicioId: l.refId } : { productoId: l.refId }),
+            ...(empId ? { empleadoId: empId } : {}),
+            cantidad: l.cantidad,
+          };
+        }),
         ...(clienteId ? { clienteId } : {}),
         ...(citaIdActual ? { citaId: citaIdActual } : {}),
         ...(descuentoGlobal > 0 ? { descuentoGlobal } : {}),
@@ -259,7 +283,11 @@ export function PosMobile() {
                     </div>
                     <span className={styles.lineaPrecio}>RD$ {formatMoney((l.precio * l.cantidad))}</span>
                   </div>
-                  {l.tipo === 'SERVICIO' && empleadosServicio.length > 0 && (
+                  {l.tipo === 'SERVICIO' && empleadoAutoAsignado && l.empleadoId === empleadoAutoAsignado.id ? (
+                    // Esta línea ya es del propio usuario logueado: no hay
+                    // nada que elegir, y no se puede reasignar a otro.
+                    <div className={styles.empSel}>Atendió: {empleadoAutoAsignado.nombre}</div>
+                  ) : l.tipo === 'SERVICIO' && !empleadoAutoAsignado && empleadosServicio.length > 0 && (
                     <select
                       className={`${styles.empSel}${!l.empleadoId ? ` ${styles.empSelWarn}` : ''}`}
                       value={l.empleadoId ?? ''}
@@ -305,7 +333,7 @@ export function PosMobile() {
               className={styles.cobrarBtn}
               onClick={() => {
                 const hay = lineas.some(l => l.tipo === 'SERVICIO' && !l.empleadoId);
-                if (hay && empleadosServicio.length > 0) { setWarnSinEmp(true); return; }
+                if (hay && empleadosServicio.length > 0 && !empleadoAutoAsignado) { setWarnSinEmp(true); return; }
                 setCarritoOpen(false); setPagoOpen(true);
               }}
             >
