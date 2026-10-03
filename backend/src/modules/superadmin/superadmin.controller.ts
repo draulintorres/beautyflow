@@ -68,6 +68,12 @@ export class SuperAdminController {
     return this.sa.usuariosHuerfanos(id);
   }
 
+  // Backfill puntual — ver SuperAdminService#backfillEmpleadoDeUsuario.
+  @Post('usuarios/:id/backfill-empleado')
+  backfillEmpleado(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sa.backfillEmpleadoDeUsuario(id);
+  }
+
   @Patch('empresas/:id')
   editarEmpresa(
     @Param('id', ParseUUIDPipe) id: string,

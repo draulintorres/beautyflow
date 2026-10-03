@@ -142,6 +142,47 @@ export class SuperAdminService {
     }));
   }
 
+  /**
+   * Backfill puntual (round "un solo camino para crear acceso"): crea el
+   * Empleado vinculado que le faltaba a un usuario real huérfano (creado
+   * por el camino viejo de "Usuarios > Nuevo usuario", ya eliminado). Solo
+   * desbloquea el cobro (modeloPago por defecto, sin Alquiler de Silla) —
+   * confirmado con Draulin antes de correr esto contra empresas reales.
+   * Un solo uso, no es parte del flujo normal de la app.
+   */
+  async backfillEmpleadoDeUsuario(usuarioId: string) {
+    const usuario = await this.prisma.usuario.findFirst({
+      where: { id: usuarioId, deletedAt: null },
+      include: { rol: true, empleado: true },
+    });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    if (usuario.rol.roleKey === RoleKey.OWNER) {
+      throw new BadRequestException('El dueño no necesita este backfill (su Empleado se autocrea al cobrar)');
+    }
+    if (usuario.empleado) {
+      throw new ConflictException('Este usuario ya tiene un Empleado vinculado');
+    }
+
+    const sucursalPrincipal = await this.prisma.sucursal.findFirst({
+      where: { empresaId: usuario.empresaId, activo: true },
+      orderBy: [{ esPrincipal: 'desc' }, { createdAt: 'asc' }],
+      select: { id: true },
+    });
+
+    const empleado = await this.prisma.empleado.create({
+      data: {
+        empresaId: usuario.empresaId,
+        usuarioId: usuario.id,
+        nombre: usuario.nombre,
+        puesto: usuario.rol.nombre,
+        sucursalId: sucursalPrincipal?.id,
+        activo: true,
+      },
+    });
+
+    return { empleadoId: empleado.id, usuarioId: usuario.id, nombre: empleado.nombre, sucursalId: empleado.sucursalId };
+  }
+
   async crearEmpresa(dto: CrearEmpresaDto) {
     // slug único
     const existe = await this.prisma.empresa.findUnique({
