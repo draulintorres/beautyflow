@@ -80,16 +80,6 @@ export class SuperAdminService {
   }
 
   // ============ EMPRESAS ============
-  /** DIAGNÓSTICO TEMPORAL (solo lectura) — se borra después de usarlo. */
-  async diagnosticoDeudas(empresaId: string) {
-    const deudas = await this.prisma.deudaAlquiler.findMany({
-      where: { empresaId },
-      select: { concepto: true, montoTotal: true, montoPagado: true, saldo: true, estado: true, createdAt: true, empleado: { select: { nombre: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
-    return deudas.map((d) => ({ ...d, montoTotal: d.montoTotal.toString(), montoPagado: d.montoPagado.toString(), saldo: d.saldo.toString() }));
-  }
-
   async listarEmpresas(filtro?: { estado?: EmpresaStatus }) {
     const empresas = await this.prisma.empresa.findMany({
       where: {
