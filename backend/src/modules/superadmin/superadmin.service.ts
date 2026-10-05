@@ -80,6 +80,52 @@ export class SuperAdminService {
   }
 
   // ============ EMPRESAS ============
+  /** DIAGNÓSTICO TEMPORAL (solo lectura) — se borra después de usarlo. */
+  async diagnosticoAlquiler(empresaId: string) {
+    const empleados = await this.prisma.empleado.findMany({
+      where: { empresaId, deletedAt: null },
+      select: {
+        id: true, nombre: true, modeloPago: true, esCuentaDueno: true,
+        activo: true, usuarioId: true, participaAgenda: true,
+        usuario: { select: { email: true, rol: { select: { roleKey: true } } } },
+        alquilerConfig: true,
+      },
+    });
+    const detalles = await this.prisma.detalleVenta.findMany({
+      where: { empleadoId: { in: empleados.map((e) => e.id) } },
+      select: {
+        empleadoId: true, subtotal: true, tipo: true,
+        venta: { select: { createdAt: true, estado: true, total: true } },
+      },
+      take: 2000,
+    });
+    const resumen = empleados.map((e) => {
+      const mine = detalles.filter((d) => d.empleadoId === e.id);
+      return {
+        empleadoId: e.id,
+        nombre: e.nombre,
+        modeloPago: e.modeloPago,
+        esCuentaDueno: e.esCuentaDueno,
+        activo: e.activo,
+        participaAgenda: e.participaAgenda,
+        rolUsuario: e.usuario?.rol?.roleKey ?? null,
+        email: e.usuario?.email ?? null,
+        alquilerConfig: e.alquilerConfig
+          ? { tipoCuota: e.alquilerConfig.tipoCuota, flujoDinero: e.alquilerConfig.flujoDinero,
+              montoPorServicio: e.alquilerConfig.montoPorServicio?.toString() ?? null,
+              montoRenta: e.alquilerConfig.montoRenta?.toString() ?? null,
+              activo: e.alquilerConfig.activo }
+          : null,
+        lineasAtribuidas: mine.length,
+        ingresoAtribuido: mine.reduce((s, d) => s + Number(d.subtotal), 0),
+        primeraFecha: mine.length ? mine.map((d) => d.venta.createdAt).sort((a, b) => +a - +b)[0] : null,
+        ultimaFecha: mine.length ? mine.map((d) => d.venta.createdAt).sort((a, b) => +b - +a)[0] : null,
+      };
+    });
+    const deudas = await this.prisma.deudaAlquiler.count({ where: { empresaId } });
+    return { empresaId, empleados: resumen, deudasAlquilerTotal: deudas };
+  }
+
   async listarEmpresas(filtro?: { estado?: EmpresaStatus }) {
     const empresas = await this.prisma.empresa.findMany({
       where: {
