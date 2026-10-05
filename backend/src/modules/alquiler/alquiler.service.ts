@@ -176,6 +176,16 @@ export class AlquilerService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // Bloquea las cuotas abiertas del inquilino antes de leer saldos: dos cobros
+      // simultáneos quedan en fila y el segundo ve el saldo ya reducido por el primero.
+      await tx.$queryRaw`
+        SELECT id FROM deudas_alquiler
+        WHERE empresa_id = ${empresaId}::uuid
+          AND empleado_id = ${empleadoId}::uuid
+          AND estado IN ('PENDIENTE', 'ABONO_PARCIAL')
+        ORDER BY created_at ASC
+        FOR UPDATE`;
+
       const deudas = await tx.deudaAlquiler.findMany({
         where: {
           empresaId,

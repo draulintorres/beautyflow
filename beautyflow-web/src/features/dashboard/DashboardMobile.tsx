@@ -194,7 +194,7 @@ export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursal
           {kpis?.alquilerMes && (
             <>
               <div className={styles.kpiSub}>+ RD$ {formatMoney(kpis.alquilerMes.generado)} alquiler de sillas (este mes)</div>
-              <div className={styles.kpiSub}>cobrado RD$ {formatMoney(kpis.alquilerMes.cobrado)}</div>
+              <div className={styles.kpiSub}>cobrado este mes RD$ {formatMoney(kpis.alquilerMes.cobrado)}</div>
             </>
           )}
         </div>

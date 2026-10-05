@@ -405,7 +405,7 @@ export function DashboardPage() {
                 <div className={styles.resumenRow}>
                   <span className={styles.resumenIcon} />
                   <span>+ RD$ {formatMoney(kpis.alquilerMes.generado)} alquiler de sillas</span>
-                  <b className={styles.resumenVal}>cobrado RD$ {formatMoney(kpis.alquilerMes.cobrado)}</b>
+                  <b className={styles.resumenVal}>cobrado este mes RD$ {formatMoney(kpis.alquilerMes.cobrado)}</b>
                 </div>
               )}
             </div>
