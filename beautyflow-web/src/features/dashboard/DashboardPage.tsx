@@ -17,6 +17,7 @@ interface Kpis {
   citasHoy: number; clientesNuevos: number; clientesVip: number;
   cuentasPorCobrar: number; ticketPromedio: number; porcentajeOcupacion: number;
   porCobrarInquilinos?: { inquilinos: number; saldo: number; generadoHoy: number };
+  alquilerMes?: { generado: number; cobrado: number } | null;
 }
 interface Graficas {
   ventas12Meses: { mes: string; total: number }[];
@@ -31,7 +32,8 @@ interface Rankings {
   comisionesPendientesDetalle: ComisionEmpleado[];
   comisionesPendientesSinAsignar: number;
   topClientes: { clienteId: string; nombre: string; gastoTotal: number }[];
-  empleadosReales: number;
+  tienePersonalPropio: boolean;
+  tieneComisiones: boolean;
 }
 interface SucursalVentas {
   sucursalId: string; nombre: string; esPrincipal: boolean;
@@ -177,6 +179,9 @@ export function DashboardPage() {
     );
   }
 
+  const mostrarTop = !!rankings?.tienePersonalPropio;
+  const mostrarComisiones = !!rankings?.tieneComisiones;
+
   return (
     <>
       <div className={styles.mobileOnly}>
@@ -294,7 +299,8 @@ export function DashboardPage() {
       </div>
 
       {/* ─── Top empleados + Servicios + Comisiones ─── */}
-      <div className={styles.row3}>
+      <div className={styles.row3} style={{ gridTemplateColumns: `repeat(${1 + Number(mostrarTop) + Number(mostrarComisiones)}, 1fr)` }}>
+        {mostrarTop && (
         <Panel title="Top Empleados (ingresos)">
           {(rankings?.topEmpleados ?? []).length === 0
             ? <EmptyRow msg="Sin datos de empleados aún" />
@@ -311,6 +317,7 @@ export function DashboardPage() {
               </div>
             )}
         </Panel>
+        )}
 
         <Panel title="Servicios más vendidos"
           extra={
@@ -336,6 +343,7 @@ export function DashboardPage() {
             )}
         </Panel>
 
+        {mostrarComisiones && (
         <Panel title="Comisiones pendientes"
           extra={
             <button type="button" className={styles.more}
@@ -368,6 +376,7 @@ export function DashboardPage() {
             )}
           </div>
         </Panel>
+        )}
       </div>
 
       {/* ─── Métodos de pago + Resumen del día ─── */}
@@ -392,6 +401,13 @@ export function DashboardPage() {
                   <b className={styles.resumenVal}>{r.val}</b>
                 </div>
               ))}
+              {kpis?.alquilerMes && (
+                <div className={styles.resumenRow}>
+                  <span className={styles.resumenIcon} />
+                  <span>+ RD$ {formatMoney(kpis.alquilerMes.generado)} alquiler de sillas</span>
+                  <b className={styles.resumenVal}>cobrado RD$ {formatMoney(kpis.alquilerMes.cobrado)}</b>
+                </div>
+              )}
             </div>
             <div className={styles.metaRing}>
               <RingOcupacion pct={kpis?.porcentajeOcupacion ?? 0} />

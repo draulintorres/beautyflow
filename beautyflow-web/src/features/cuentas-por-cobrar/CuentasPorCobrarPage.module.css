@@ -282,6 +282,10 @@
 }
 .detailSectionTitle { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 
+/* Detalle: acciones (cobro general) */
+.detailActions { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.detailActions .btnCobrar { width: 100%; justify-content: center; }
+
 /* Detalle: facturas */
 .detailFacturas { display: flex; flex-direction: column; }
 

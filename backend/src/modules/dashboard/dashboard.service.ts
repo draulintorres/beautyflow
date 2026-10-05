@@ -172,6 +172,10 @@ export class DashboardService {
     // Lo que los inquilinos le deben al dueño (DeudaAlquiler), sin contar
     // anuladas ni saldadas. Solo se muestra si hay al menos un inquilino.
     const porCobrarInquilinos = await this.porCobrarInquilinos(sucursalId, inicioHoy, finHoy);
+    const alquilerMes =
+      porCobrarInquilinos.inquilinos > 0
+        ? await this.alquilerDelMes(sucursalId, inicioMes)
+        : null;
 
     // % de ocupación de agenda hoy (citas activas vs capacidad estimada)
     const ocupacion = await this.calcularOcupacionHoy(
@@ -191,6 +195,42 @@ export class DashboardService {
       ticketPromedio: this.round(Number(ticketAgg._avg.total ?? 0)),
       porcentajeOcupacion: ocupacion,
       porCobrarInquilinos,
+      alquilerMes,
+    };
+  }
+
+  /**
+   * Línea de alquiler del mes (separada de Ventas mes, que no cambia).
+   * generado = cuotas creadas este mes (no anuladas).
+   * cobrado = abonos registrados este mes sobre deudas no anuladas. Ojo:
+   * abonos de meses anteriores sobre una deuda de este mes cuentan como
+   * cobrado de este mes — es el dinero que entró, no la cuota pagada.
+   */
+  private async alquilerDelMes(
+    sucursalId: string | null,
+    inicioMes: Date,
+  ): Promise<{ generado: number; cobrado: number }> {
+    const porSucursal = sucursalId ? { empleado: { sucursalId } } : {};
+    const [generado, cobrado] = await Promise.all([
+      this.prisma.db.deudaAlquiler.aggregate({
+        where: {
+          ...porSucursal,
+          createdAt: { gte: inicioMes },
+          estado: { not: EstadoDeudaAlquiler.ANULADA },
+        },
+        _sum: { montoTotal: true },
+      }),
+      this.prisma.db.abonoAlquiler.aggregate({
+        where: {
+          createdAt: { gte: inicioMes },
+          deudaAlquiler: { ...porSucursal, estado: { not: EstadoDeudaAlquiler.ANULADA } },
+        },
+        _sum: { monto: true },
+      }),
+    ]);
+    return {
+      generado: this.round(Number(generado._sum.montoTotal ?? 0)),
+      cobrado: this.round(Number(cobrado._sum.monto ?? 0)),
     };
   }
 
@@ -334,26 +374,42 @@ export class DashboardService {
   // ============ RANKINGS ============
   async rankings(sucursalIdReq?: string) {
     const sucursalId = await this.scopeSucursalId(sucursalIdReq);
-    const [topEmpleados, comisiones, topClientes, empleadosReales] = await Promise.all([
+    const [topEmpleados, comisiones, topClientes, personalPropio, comisionEmpleados] = await Promise.all([
       this.topEmpleados(sucursalId),
       this.comisionesPendientesData(sucursalId),
       this.topClientes(sucursalId),
-      // Personal contratado real (excluye el Empleado fantasma del dueño,
-      // mismo criterio que LimitsService y topEmpleados) — el Dashboard
-      // móvil lo usa para decidir si "Top empleados"/"Comisiones
-      // pendientes" tiene sentido mostrarse o si conviene reemplazarlos
-      // por "Servicios más vendidos" mientras la empresa no tenga staff.
+      // Personal propio: activo, no es el fantasma del dueño ni un inquilino
+      // (criterio único de inquilino). Decide si "Top empleados" aplica.
       this.prisma.db.empleado.count({
-        where: { esCuentaDueno: false, activo: true, ...this.sucFilter(sucursalId) },
+        where: {
+          esCuentaDueno: false,
+          activo: true,
+          NOT: DashboardService.INQUILINO_WHERE,
+          ...this.sucFilter(sucursalId),
+        },
+      }),
+      // Empleados de comisión activos (excluye al fantasma del dueño).
+      this.prisma.db.empleado.count({
+        where: {
+          esCuentaDueno: false,
+          activo: true,
+          modeloPago: ModeloPago.COMISION,
+          ...this.sucFilter(sucursalId),
+        },
       }),
     ]);
+    const tienePersonalPropio = personalPropio > 0;
     return {
       topEmpleados,
       comisionesPendientes: comisiones.total,
       comisionesPendientesDetalle: comisiones.porEmpleado,
       comisionesPendientesSinAsignar: comisiones.sinAsignar,
       topClientes,
-      empleadosReales,
+      // Top empleados se muestra solo con personal propio.
+      tienePersonalPropio,
+      // Comisiones: hay empleados de comisión, o hay saldo pendiente aunque
+      // el empleado ya no esté activo (no esconder una deuda real).
+      tieneComisiones: comisionEmpleados > 0 || comisiones.total > 0,
     };
   }
 

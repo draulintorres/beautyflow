@@ -76,6 +76,16 @@ export class AlquilerController {
     return this.alquiler.registrarAbono(id, dto);
   }
 
+  // Cobro general: mismos roles que el abono individual (OWNER/ADMIN, a nivel
+  // de clase), así que un inquilino tampoco puede cobrarse a sí mismo aquí.
+  @Post('inquilinos/:empleadoId/abono-general')
+  registrarAbonoGeneral(
+    @Param('empleadoId', ParseUUIDPipe) empleadoId: string,
+    @Body() dto: RegistrarAbonoAlquilerDto,
+  ) {
+    return this.alquiler.registrarAbonoGeneral(empleadoId, dto);
+  }
+
   // ---------- dev: crear una deuda de prueba sin depender de Pieza 2 ----------
   @Post('dev/deuda-prueba')
   crearDeudaPrueba(@Body() dto: CrearDeudaPruebaDto) {

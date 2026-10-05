@@ -10,6 +10,7 @@ interface Kpis {
   citasHoy: number; clientesNuevos: number; clientesVip: number;
   cuentasPorCobrar: number; ticketPromedio: number; porcentajeOcupacion: number;
   porCobrarInquilinos?: { inquilinos: number; saldo: number; generadoHoy: number };
+  alquilerMes?: { generado: number; cobrado: number } | null;
 }
 interface Rankings {
   topEmpleados: { empleadoId: string; nombre: string; ingresos: number; comisiones: number }[];
@@ -17,7 +18,8 @@ interface Rankings {
   comisionesPendientesDetalle: { empleadoId: string; nombre: string; monto: number }[];
   comisionesPendientesSinAsignar: number;
   topClientes: { clienteId: string; nombre: string; gastoTotal: number }[];
-  empleadosReales: number;
+  tienePersonalPropio: boolean;
+  tieneComisiones: boolean;
 }
 interface ServicioVendido { id: string; nombre: string; cantidad: number; total: number }
 interface SucursalLite { sucursalId: string; nombre: string; }
@@ -92,7 +94,13 @@ export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursal
   // ver dashboard.service.ts rankings()), "Top empleados"/"Comisiones
   // pendientes" siempre van a estar vacíos estructuralmente. Se reemplazan
   // por "Servicios más vendidos", útil para cualquier negocio.
-  const tieneEmpleados = (rankings?.empleadosReales ?? 0) > 0;
+  // Cada bloque tiene su propia condición (ver rankings() en el backend):
+  // Top empleados solo con personal propio; Comisiones si hay empleados de
+  // comisión o saldo pendiente; Servicios más vendidos cuando no hay
+  // personal propio (el salón solo tiene inquilinos o el dueño).
+  const mostrarTop = !!rankings?.tienePersonalPropio;
+  const mostrarComisiones = !!rankings?.tieneComisiones;
+  const mostrarServicios = !rankings?.tienePersonalPropio;
   const maxSvc = Math.max(1, ...(serviciosMasVendidos ?? []).map(s => s.cantidad));
 
   // "Citas de hoy" también se filtra a la sucursal elegida (para el OWNER),
@@ -183,6 +191,12 @@ export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursal
         <div className={`${styles.kpiCard} ${styles.kpiCardWide}`}>
           <div className={styles.kpiLabel}>Ventas mes</div>
           <div className={styles.kpiVal}>RD$ {formatMoney(kpis?.ventasMes ?? 0)}</div>
+          {kpis?.alquilerMes && (
+            <>
+              <div className={styles.kpiSub}>+ RD$ {formatMoney(kpis.alquilerMes.generado)} alquiler de sillas (este mes)</div>
+              <div className={styles.kpiSub}>cobrado RD$ {formatMoney(kpis.alquilerMes.cobrado)}</div>
+            </>
+          )}
         </div>
         {!!kpis?.porCobrarInquilinos?.inquilinos && (
           <div className={`${styles.kpiCard} ${styles.kpiCardWide}`}>
@@ -232,7 +246,7 @@ export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursal
         )}
       </div>
 
-      {tieneEmpleados ? (
+      {mostrarTop && (
         <>
           {/* ─── Top empleados ─── */}
           <div className={styles.section}>
@@ -254,7 +268,11 @@ export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursal
               </div>
             )}
           </div>
+        </>
+      )}
 
+      {mostrarComisiones && (
+        <>
           {/* ─── Comisiones pendientes ─── */}
           <div className={styles.section}>
             <div className={styles.secHead}>
@@ -285,9 +303,11 @@ export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursal
             )}
           </div>
         </>
-      ) : (
+      )}
+
+      {mostrarServicios && (
         /* ─── Servicios más vendidos (reemplaza Top empleados/Comisiones
-             mientras la empresa no tenga ningún empleado real) ─── */
+             mientras no haya personal propio) ─── */
         <div className={styles.section}>
           <div className={styles.secHead}>
             <span className={styles.secTitle}>Servicios más vendidos</span>

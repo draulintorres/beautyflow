@@ -922,6 +922,263 @@ function HistorialAlquilerModal({
   );
 }
 
+// ── Cobro general: reparte un monto entre todas las cuotas del inquilino ──
+interface CuotaAplicada {
+  deudaId: string;
+  concepto: string;
+  aplicado: number;
+  saldoRestante: number;
+  estado: DeudaAlquiler['estado'];
+}
+interface ResultadoCobroGeneral {
+  aplicado: CuotaAplicada[];
+  totalAplicado: number;
+  saldoTotalAntes: number;
+  saldoTotalDespues: number;
+}
+
+function CobroGeneralModal({
+  empleadoId,
+  inquilinoNombre,
+  saldoTotal,
+  cuotasAbiertas,
+  metodosPago,
+  onClose,
+  onDone,
+}: {
+  empleadoId: string;
+  inquilinoNombre: string;
+  saldoTotal: number;
+  cuotasAbiertas: number;
+  metodosPago: MetodoPago[];
+  onClose: () => void;
+  onDone: (r: ResultadoCobroGeneral) => void;
+}) {
+  const qc = useQueryClient();
+  const saldoRedondeado = Math.round(saldoTotal * 100) / 100;
+
+  const [otroMonto, setOtroMonto]       = useState(false);
+  const [montoInput, setMontoInput]     = useState(saldoRedondeado.toFixed(2));
+  const [metodoPagoId, setMetodoPagoId] = useState('');
+  const [nota, setNota]                 = useState('');
+  const [err, setErr]                   = useState('');
+  const [confirmando, setConfirmando]   = useState(false);
+  const [resultado, setResultado]       = useState<ResultadoCobroGeneral | null>(null);
+
+  const montoNum    = otroMonto ? (parseFloat(montoInput) || 0) : saldoRedondeado;
+  const montoValido = montoNum > 0 && montoNum <= saldoRedondeado + 0.01;
+  const nuevoSaldo  = Math.max(0, saldoRedondeado - montoNum);
+  const metodoNombre = metodosPago.find(m => m.id === metodoPagoId)?.nombre;
+
+  const cobrar = useMutation({
+    mutationFn: () =>
+      api.post(`/alquiler/inquilinos/${empleadoId}/abono-general`, {
+        monto: montoNum,
+        ...(metodoPagoId ? { metodoPagoId } : {}),
+        ...(nota.trim() ? { nota: nota.trim() } : {}),
+      }).then(r => r.data as ResultadoCobroGeneral),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['alquiler-deudas'] });
+      qc.invalidateQueries({ queryKey: ['alquiler-deuda-detalle'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-graficas'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-rankings'] });
+      setResultado(r);
+    },
+    onError: (e) => { setErr(errMsg(e)); setConfirmando(false); },
+  });
+
+  const handleContinuar = () => {
+    setErr('');
+    if (!montoValido || cobrar.isPending) return;
+    if (!confirmando) { setConfirmando(true); return; }
+    cobrar.mutate();
+  };
+
+  const cerrar = () => {
+    if (cobrar.isPending) return;
+    if (resultado) onDone(resultado);
+    else onClose();
+  };
+
+  if (resultado) {
+    const sinCambios = cuotasAbiertas - resultado.aplicado.length;
+    return (
+      <div className={styles.overlay} onClick={e => { if (e.target === e.currentTarget) cerrar(); }}>
+        <div className={styles.modal} onClick={e => e.stopPropagation()}>
+          <div className={styles.modalHead}>
+            <h3>Cobro registrado</h3>
+            <button type="button" className={styles.closeBtn} onClick={cerrar}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <div className={styles.modalBody}>
+            <div className={styles.deudaCtx}>
+              <div className={styles.deudaCtxRow}><span>Inquilino</span><strong>{inquilinoNombre}</strong></div>
+              <div className={styles.deudaCtxRow}><span>Cobrado</span><strong>{fmtDec(resultado.totalAplicado)}</strong></div>
+              <div className={`${styles.deudaCtxRow} ${styles.deudaCtxSaldo}`}>
+                <span>Saldo restante</span>
+                <strong className={styles.saldoDestacado}>{fmtDec(resultado.saldoTotalDespues)}</strong>
+              </div>
+            </div>
+
+            <div className={styles.historialList}>
+              {resultado.aplicado.map(c => (
+                <div key={c.deudaId} className={styles.historialItem}>
+                  <div className={styles.histItemLeft}>
+                    <div className={styles.histItemTop}>
+                      <span className={styles.histBadgeAbono}>
+                        {c.estado === 'SALDADA' ? 'Saldada' : 'Parcial'}
+                      </span>
+                    </div>
+                    <div className={styles.histItemBot}>
+                      <span className={styles.histRef}>{c.concepto}</span>
+                      {c.estado !== 'SALDADA' && (
+                        <span className={styles.histFecha}>Saldo: {fmtDec(c.saldoRestante)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.histItemRight}>
+                    <span className={styles.histMonto}>{fmtDec(c.aplicado)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {sinCambios > 0 && (
+              <p className={styles.emptyMsg}>
+                {sinCambios} cuota{sinCambios === 1 ? '' : 's'} sin cambios.
+              </p>
+            )}
+          </div>
+
+          <div className={styles.modalFoot}>
+            <button type="button" className={styles.btnCobrar} onClick={cerrar}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.overlay} onClick={e => { if (e.target === e.currentTarget) cerrar(); }}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHead}>
+          <h3>Cobrar todo</h3>
+          <button type="button" className={styles.closeBtn} onClick={cerrar}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div className={styles.modalBody}>
+          <div className={styles.deudaCtx}>
+            <div className={styles.deudaCtxRow}><span>Inquilino</span><strong>{inquilinoNombre}</strong></div>
+            <div className={styles.deudaCtxRow}><span>Cuotas abiertas</span><strong>{cuotasAbiertas}</strong></div>
+            <div className={`${styles.deudaCtxRow} ${styles.deudaCtxSaldo}`}>
+              <span>Saldo total</span>
+              <strong className={styles.saldoDestacado}>{fmtDec(saldoRedondeado)}</strong>
+            </div>
+          </div>
+
+          <div className={styles.formField}>
+            <label>
+              <input
+                type="radio" name="cobroMonto" checked={!otroMonto}
+                onChange={() => { setOtroMonto(false); setConfirmando(false); setErr(''); }}
+              />{' '}
+              Cobrar todo ({fmtDec(saldoRedondeado)})
+            </label>
+            <label>
+              <input
+                type="radio" name="cobroMonto" checked={otroMonto}
+                onChange={() => { setOtroMonto(true); setConfirmando(false); setErr(''); }}
+              />{' '}
+              Otro monto
+            </label>
+          </div>
+
+          {otroMonto && (
+            <div className={styles.formField}>
+              <label>Monto a cobrar *</label>
+              <div className={styles.montoWrap}>
+                <span className={styles.montoPrefix}>RD$</span>
+                <input
+                  type="number" min="0.01" max={saldoRedondeado} step="0.01"
+                  value={montoInput}
+                  onChange={e => { setMontoInput(e.target.value); setConfirmando(false); setErr(''); }}
+                  className={styles.montoInput}
+                />
+              </div>
+              {montoInput !== '' && !(parseFloat(montoInput) > 0) && (
+                <span className={styles.fieldErr}>El monto debe ser mayor que cero.</span>
+              )}
+              {montoNum > saldoRedondeado + 0.01 && (
+                <span className={styles.fieldErr}>No puede exceder el saldo total ({fmtDec(saldoRedondeado)}).</span>
+              )}
+            </div>
+          )}
+
+          {montoValido && (
+            <div className={`${styles.saldoPreview} ${nuevoSaldo <= 0.01 ? styles.saldoPreviewCero : ''}`}>
+              {nuevoSaldo <= 0.01
+                ? 'Se aplicará de la cuota más antigua a la más nueva, hasta saldar todo.'
+                : `Saldo restante después del cobro: ${fmtDec(nuevoSaldo)}.`}
+            </div>
+          )}
+
+          <div className={styles.formField}>
+            <label>Método de pago <span className={styles.opcional}>(opcional)</span></label>
+            <select value={metodoPagoId} onChange={e => { setMetodoPagoId(e.target.value); setConfirmando(false); }} className={styles.select}>
+              <option value="">Sin especificar</option>
+              {metodosPago.filter(m => m.activo).map(m => (
+                <option key={m.id} value={m.id}>{m.nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.formField}>
+            <label>Nota <span className={styles.opcional}>(opcional)</span></label>
+            <input
+              type="text" placeholder="Comentario interno…"
+              value={nota} onChange={e => setNota(e.target.value)}
+              maxLength={255} className={styles.inputText}
+            />
+          </div>
+
+          {confirmando && montoValido && (
+            <div className={styles.confirmBox}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" width="16" height="16">
+                <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+              </svg>
+              <span>
+                ¿Confirmar cobro de <strong>{fmtDec(montoNum)}</strong> de{' '}
+                <strong>{inquilinoNombre}</strong>
+                {metodoNombre ? <> con <strong>{metodoNombre}</strong></> : null}
+                {nota.trim() ? <> — “{nota.trim()}”</> : null}?
+              </span>
+            </div>
+          )}
+
+          {err && <div className={styles.modalErr}>{err}</div>}
+        </div>
+
+        <div className={styles.modalFoot}>
+          <button type="button" className={styles.btnCancel} onClick={onClose} disabled={cobrar.isPending}>
+            Cancelar
+          </button>
+          <button
+            type="button" className={styles.btnCobrar}
+            onClick={handleContinuar}
+            disabled={!montoValido || cobrar.isPending}
+          >
+            {cobrar.isPending ? 'Registrando…' : confirmando ? '✓ Confirmar cobro' : 'Continuar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Deuda card dentro del panel de detalle del inquilino ───
 function DeudaInPanel({
   deuda,
@@ -989,15 +1246,18 @@ function DeudaInPanel({
 function InquilinoDetailPanel({
   grupo,
   onCobrar,
+  onCobrarTodo,
   onHistorial,
   onClose,
 }: {
   grupo: InquilinoGrupo;
   onCobrar: (d: DeudaAlquiler) => void;
+  onCobrarTodo: () => void;
   onHistorial: (id: string) => void;
   onClose: () => void;
 }) {
   const deudasAbiertas = grupo.deudas.filter(d => Number(d.saldo) > 0.01);
+  const [verDetalle, setVerDetalle] = useState(false);
 
   return (
     <div className={styles.detailPanel}>
@@ -1023,21 +1283,38 @@ function InquilinoDetailPanel({
         </div>
       </div>
 
+      {deudasAbiertas.length > 0 && (
+        <div className={styles.detailActions}>
+          <button type="button" className={styles.btnCobrar} onClick={onCobrarTodo}>
+            Cobrar todo
+          </button>
+        </div>
+      )}
+
       <div className={styles.detailSectionHead}>
-        <span className={styles.detailSectionTitle}>
-          {deudasAbiertas.length === 1 ? '1 cuota pendiente' : `${deudasAbiertas.length} cuotas pendientes`}
-        </span>
+        <button
+          type="button"
+          className={styles.btnHist}
+          onClick={() => setVerDetalle(v => !v)}
+          aria-expanded={verDetalle}
+        >
+          {verDetalle
+            ? 'Ocultar detalle'
+            : `Ver detalle (${deudasAbiertas.length} cuota${deudasAbiertas.length === 1 ? '' : 's'})`}
+        </button>
       </div>
-      <div className={styles.detailFacturas}>
-        {deudasAbiertas.map(d => (
-          <DeudaInPanel
-            key={d.id}
-            deuda={d}
-            onCobrar={() => onCobrar(d)}
-            onHistorial={() => onHistorial(d.id)}
-          />
-        ))}
-      </div>
+      {verDetalle && (
+        <div className={styles.detailFacturas}>
+          {deudasAbiertas.map(d => (
+            <DeudaInPanel
+              key={d.id}
+              deuda={d}
+              onCobrar={() => onCobrar(d)}
+              onHistorial={() => onHistorial(d.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1114,6 +1391,9 @@ export function CuentasPorCobrarPage() {
   const [selectedInquilino, setSelectedInquilino] = useState<string | null>(null);
   const [abonoTarget, setAbonoTarget]   = useState<DeudaAlquiler | null>(null);
   const [histAlqId, setHistAlqId]       = useState<string | null>(null);
+  // Snapshot del inquilino al abrir el cobro general: si al pagar todo el grupo
+  // desaparece de la lista, el modal sigue mostrando el resumen.
+  const [cobroGeneralGrupo, setCobroGeneralGrupo] = useState<InquilinoGrupo | null>(null);
 
   const { data: deudasAlquiler = [], isLoading: loadAlq } = useQuery<DeudaAlquiler[]>({
     queryKey: ['alquiler-deudas'],
@@ -1161,6 +1441,11 @@ export function CuentasPorCobrarPage() {
   function handleAbonoSuccess(monto: number, nuevoSaldo: number) {
     setAbonoTarget(null);
     showToast(`Abono registrado: ${fmtDec(monto)}. Saldo restante: ${fmtDec(nuevoSaldo)}.`);
+  }
+
+  function handleCobroGeneralDone(r: ResultadoCobroGeneral) {
+    setCobroGeneralGrupo(null);
+    showToast(`Cobro registrado: ${fmtDec(r.totalAplicado)}. Saldo restante: ${fmtDec(r.saldoTotalDespues)}.`);
   }
 
   function toggleInquilino(empleadoId: string) {
@@ -1610,8 +1895,10 @@ export function CuentasPorCobrarPage() {
         {selectedGrupoInquilino && (
           <div className={styles.rightPanel}>
             <InquilinoDetailPanel
+              key={selectedGrupoInquilino.empleadoId}
               grupo={selectedGrupoInquilino}
               onCobrar={d => setAbonoTarget(d)}
+              onCobrarTodo={() => setCobroGeneralGrupo(selectedGrupoInquilino)}
               onHistorial={id => setHistAlqId(id)}
               onClose={() => setSelectedInquilino(null)}
             />
@@ -1630,6 +1917,18 @@ export function CuentasPorCobrarPage() {
           metodosPago={metodosPago}
           onClose={() => setAbonoTarget(null)}
           onSuccess={handleAbonoSuccess}
+        />
+      )}
+
+      {cobroGeneralGrupo && (
+        <CobroGeneralModal
+          empleadoId={cobroGeneralGrupo.empleadoId}
+          inquilinoNombre={cobroGeneralGrupo.nombre}
+          saldoTotal={cobroGeneralGrupo.totalSaldo}
+          cuotasAbiertas={cobroGeneralGrupo.deudas.filter(d => Number(d.saldo) > 0.01).length}
+          metodosPago={metodosPago}
+          onClose={() => setCobroGeneralGrupo(null)}
+          onDone={handleCobroGeneralDone}
         />
       )}
 
