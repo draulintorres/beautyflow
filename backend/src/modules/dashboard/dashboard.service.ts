@@ -575,7 +575,9 @@ export class DashboardService {
   private async formasDePago(sucursalId: string | null) {
     const grupos = await this.prisma.db.pago.groupBy({
       by: ['metodoPagoId'],
-      where: this.sucFilterViaVenta(sucursalId) as Prisma.PagoWhereInput,
+      where: {
+        venta: { ...this.sucFilterViaVenta(sucursalId).venta, ...this.ventaSinInquilinos() },
+      } as Prisma.PagoWhereInput,
       _sum: { monto: true },
       _count: true,
     });
