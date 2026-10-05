@@ -124,20 +124,7 @@ export class AlquilerService {
 
   /** Registra un abono contra una deuda. Mismo patrón que Venta.registrarAbono. */
   async registrarAbono(deudaId: string, dto: RegistrarAbonoAlquilerDto) {
-    const deuda = await this.prisma.db.deudaAlquiler.findFirst({ where: { id: deudaId } });
-    if (!deuda) throw new NotFoundException('Deuda no encontrada');
-    if (deuda.estado === EstadoDeudaAlquiler.ANULADA) {
-      throw new BadRequestException('La deuda está anulada');
-    }
-    const saldoActual = Number(deuda.saldo);
-    if (saldoActual <= 0) {
-      throw new BadRequestException('La deuda no tiene saldo pendiente');
-    }
-    if (dto.monto > saldoActual + 0.01) {
-      throw new BadRequestException(
-        `El abono (${dto.monto}) excede el saldo pendiente (${saldoActual})`,
-      );
-    }
+    const empresaId = getEmpresaId();
     if (dto.metodoPagoId) {
       const metodo = await this.prisma.db.metodoPago.findFirst({
         where: { id: dto.metodoPagoId },
@@ -146,9 +133,33 @@ export class AlquilerService {
       if (!metodo) throw new BadRequestException('Método de pago no válido');
     }
 
-    await this.prisma.$transaction((tx) =>
-      this.aplicarAbonoEnTx(tx, deuda, dto.monto, dto.metodoPagoId, dto.nota),
-    );
+    await this.prisma.$transaction(async (tx) => {
+      // Bloquea la cuota antes de leer su saldo: dos abonos simultáneos se
+      // serializan y el segundo valida contra el saldo ya reducido por el primero.
+      const bloqueadas = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM deudas_alquiler
+        WHERE id = ${deudaId}::uuid AND empresa_id = ${empresaId}::uuid
+        FOR UPDATE`;
+      if (bloqueadas.length === 0) throw new NotFoundException('Deuda no encontrada');
+
+      const deuda = await tx.deudaAlquiler.findFirstOrThrow({
+        where: { id: deudaId, empresaId },
+      });
+      if (deuda.estado === EstadoDeudaAlquiler.ANULADA) {
+        throw new BadRequestException('La deuda está anulada');
+      }
+      const saldoActual = Number(deuda.saldo);
+      if (saldoActual <= 0) {
+        throw new BadRequestException('La deuda no tiene saldo pendiente');
+      }
+      if (dto.monto > saldoActual + 0.01) {
+        throw new BadRequestException(
+          `El abono (${dto.monto}) excede el saldo pendiente (${saldoActual})`,
+        );
+      }
+
+      await this.aplicarAbonoEnTx(tx, deuda, dto.monto, dto.metodoPagoId, dto.nota);
+    });
 
     return this.findDeuda(deudaId);
   }
