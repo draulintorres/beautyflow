@@ -17,6 +17,7 @@ interface Cliente {
 interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean;
   esCuentaDueno?: boolean;
+  modeloPago?: 'COMISION' | 'SUELDO_FIJO' | 'ALQUILER';
   usuario?: { id: string } | null;
 }
 interface MetodoPago { id: string; nombre: string; esEfectivo: boolean; activo: boolean; orden: number; }
@@ -86,8 +87,10 @@ export function PosMobile() {
   // dueño (resolveEmpleadoRegistra), no personal contratado — no tiene
   // sentido ofrecerlo como opción de "quién lo hizo" ni exigir el aviso de
   // "sin comisión" cuando es la única persona cobrando.
+  // Inquilinos (ALQUILER activo) no se ofrecen aquí: su venta es suya, no
+  // del salón, y no deben aparecer como "quién lo hizo" del dueño.
   const empleadosServicio = empleados
-    .filter(e => e.activo && e.participaAgenda && !e.esCuentaDueno)
+    .filter(e => e.activo && e.participaAgenda && !e.esCuentaDueno && e.modeloPago !== 'ALQUILER')
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
   // Mismo criterio que PosPage.tsx (escritorio): si el usuario logueado

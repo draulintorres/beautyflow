@@ -7,6 +7,8 @@ import {
   VentaStatus,
   CitaStatus,
   LineaTipo,
+  ModeloPago,
+  EstadoDeudaAlquiler,
   Prisma,
 } from '@prisma/client';
 
@@ -45,6 +47,25 @@ export class DashboardService {
   /** where para modelos con sucursalId propio (Venta, Cita). */
   private sucFilter(sucursalId: string | null): { sucursalId?: string } {
     return sucursalId ? { sucursalId } : {};
+  }
+
+  /**
+   * Criterio único de inquilino (mismo que ingresoHoy en agenda.service.ts):
+   * modeloPago ALQUILER con alquilerConfig activa. Las ventas de inquilinos
+   * no son del salón, así que el dashboard del dueño las excluye de todas
+   * sus métricas de venta — deuda técnica conocida: reclasificar a un
+   * empleado reescribe sus métricas históricas.
+   */
+  private static readonly INQUILINO_WHERE = {
+    modeloPago: ModeloPago.ALQUILER,
+    alquilerConfig: { activo: true },
+  };
+
+  /** Venta sin ninguna línea de inquilino (factura limpia: no se mezclan). */
+  private ventaSinInquilinos(): Prisma.VentaWhereInput {
+    return {
+      detalles: { none: { empleado: DashboardService.INQUILINO_WHERE } },
+    };
   }
 
   /**
@@ -91,20 +112,22 @@ export class DashboardService {
       cuentasPorCobrar,
       ticketAgg,
     ] = await Promise.all([
-      // Ventas de hoy (no anuladas)
+      // Ventas de hoy (no anuladas, sin ventas de inquilinos)
       this.prisma.db.venta.aggregate({
         where: {
           ...sucVenta,
+          ...this.ventaSinInquilinos(),
           createdAt: { gte: inicioHoy, lte: finHoy },
           estado: { not: VentaStatus.ANULADA },
         },
         _sum: { total: true },
         _count: true,
       }),
-      // Ventas del mes
+      // Ventas del mes (sin ventas de inquilinos)
       this.prisma.db.venta.aggregate({
         where: {
           ...sucVenta,
+          ...this.ventaSinInquilinos(),
           createdAt: { gte: inicioMes },
           estado: { not: VentaStatus.ANULADA },
         },
@@ -131,10 +154,11 @@ export class DashboardService {
         },
         _sum: { saldo: true },
       }),
-      // Ticket promedio del mes
+      // Ticket promedio del mes (sin ventas de inquilinos)
       this.prisma.db.venta.aggregate({
         where: {
           ...sucVenta,
+          ...this.ventaSinInquilinos(),
           createdAt: { gte: inicioMes },
           estado: { not: VentaStatus.ANULADA },
         },
@@ -144,6 +168,10 @@ export class DashboardService {
 
     // Clientes VIP: gasto acumulado >= umbral de la empresa
     const clientesVip = await this.contarVip(sucursalId);
+
+    // Lo que los inquilinos le deben al dueño (DeudaAlquiler), sin contar
+    // anuladas ni saldadas. Solo se muestra si hay al menos un inquilino.
+    const porCobrarInquilinos = await this.porCobrarInquilinos(sucursalId, inicioHoy, finHoy);
 
     // % de ocupación de agenda hoy (citas activas vs capacidad estimada)
     const ocupacion = await this.calcularOcupacionHoy(
@@ -162,6 +190,47 @@ export class DashboardService {
       cuentasPorCobrar: Number(cuentasPorCobrar._sum.saldo ?? 0),
       ticketPromedio: this.round(Number(ticketAgg._avg.total ?? 0)),
       porcentajeOcupacion: ocupacion,
+      porCobrarInquilinos,
+    };
+  }
+
+  private async porCobrarInquilinos(
+    sucursalId: string | null,
+    inicioHoy: Date,
+    finHoy: Date,
+  ): Promise<{ inquilinos: number; saldo: number; generadoHoy: number }> {
+    const inquilinos = await this.prisma.db.empleado.count({
+      where: {
+        ...DashboardService.INQUILINO_WHERE,
+        activo: true,
+        ...this.sucFilter(sucursalId),
+      },
+    });
+    if (inquilinos === 0) return { inquilinos: 0, saldo: 0, generadoHoy: 0 };
+
+    const porSucursal = sucursalId ? { empleado: { sucursalId } } : {};
+    const [pendiente, hoy] = await Promise.all([
+      this.prisma.db.deudaAlquiler.aggregate({
+        where: {
+          ...porSucursal,
+          estado: { in: [EstadoDeudaAlquiler.PENDIENTE, EstadoDeudaAlquiler.ABONO_PARCIAL] },
+        },
+        _sum: { saldo: true },
+      }),
+      this.prisma.db.deudaAlquiler.aggregate({
+        where: {
+          ...porSucursal,
+          estado: { not: EstadoDeudaAlquiler.ANULADA },
+          createdAt: { gte: inicioHoy, lte: finHoy },
+        },
+        _sum: { montoTotal: true },
+      }),
+    ]);
+
+    return {
+      inquilinos,
+      saldo: this.round(Number(pendiente._sum.saldo ?? 0)),
+      generadoHoy: this.round(Number(hoy._sum.montoTotal ?? 0)),
     };
   }
 
@@ -310,6 +379,7 @@ export class DashboardService {
       const ventasDia = await this.prisma.db.venta.findMany({
         where: {
           ...this.sucFilter(sucursalId),
+          ...this.ventaSinInquilinos(),
           createdAt: { gte: desde, lt: hasta },
           estado: { not: VentaStatus.ANULADA },
         },
@@ -353,6 +423,7 @@ export class DashboardService {
     const ventas = await this.prisma.db.venta.findMany({
       where: {
         ...this.sucFilter(sucursalId),
+        ...this.ventaSinInquilinos(),
         createdAt: { gte: desde, ...(hasta && { lt: hasta }) },
         estado: { not: VentaStatus.ANULADA },
       },
@@ -381,6 +452,7 @@ export class DashboardService {
       by: ['sucursalId'],
       where: {
         ...this.sucFilter(sucursalId),
+        ...this.ventaSinInquilinos(),
         estado: { not: VentaStatus.ANULADA },
       },
       _sum: { total: true },
@@ -407,6 +479,7 @@ export class DashboardService {
       where: {
         tipo,
         ...this.sucFilterViaVenta(sucursalId),
+        venta: { ...this.sucFilterViaVenta(sucursalId).venta, ...this.ventaSinInquilinos() },
       } as Prisma.DetalleVentaWhereInput,
       _sum: { cantidad: true, subtotal: true },
       _count: true,
@@ -500,7 +573,7 @@ export class DashboardService {
       by: ['empleadoId'],
       where: {
         empleadoId: { not: null },
-        empleado: { esCuentaDueno: false },
+        empleado: { esCuentaDueno: false, NOT: DashboardService.INQUILINO_WHERE },
         ...this.sucFilterViaVenta(sucursalId),
       } as Prisma.DetalleVentaWhereInput,
       _sum: { subtotal: true, comisionMonto: true },

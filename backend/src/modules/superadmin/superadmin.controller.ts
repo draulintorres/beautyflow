@@ -52,6 +52,12 @@ export class SuperAdminController {
   }
 
   // ---------- EMPRESAS ----------
+  /** DIAGNÓSTICO TEMPORAL (solo lectura) — se borra después de usarlo. */
+  @Get('empresas/:id/diagnostico-deudas')
+  diagnosticoDeudas(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sa.diagnosticoDeudas(id);
+  }
+
   @Get('empresas')
   listarEmpresas(@Query('estado') estado?: EmpresaStatus) {
     return this.sa.listarEmpresas({ estado });

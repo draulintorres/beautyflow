@@ -25,6 +25,8 @@
    vez de dejar la tarjeta sola con un hueco vacío al lado o estirarla a
    todo el ancho de 560px. */
 .kpiGrid2 { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 273px; }
+/* Con "Por cobrar a inquilinos" presente, la fila vuelve a 2 columnas. */
+.kpiGrid2Dos { grid-template-columns: repeat(2, 1fr); max-width: 560px; }
 
 /* ─── Panels ─── */
 .panel {
@@ -134,7 +136,7 @@
   .row2, .row3 { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
-  .kpiGrid4, .kpiGrid2 { grid-template-columns: 1fr; }
+  .kpiGrid4, .kpiGrid2, .kpiGrid2Dos { grid-template-columns: 1fr; }
 }
 
 /* ─── Desktop vs Mobile toggle ─── */

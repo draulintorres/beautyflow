@@ -16,6 +16,7 @@ interface Kpis {
   ventasHoy: number; numVentasHoy: number; ventasMes: number;
   citasHoy: number; clientesNuevos: number; clientesVip: number;
   cuentasPorCobrar: number; ticketPromedio: number; porcentajeOcupacion: number;
+  porCobrarInquilinos?: { inquilinos: number; saldo: number; generadoHoy: number };
 }
 interface Graficas {
   ventas12Meses: { mes: string; total: number }[];
@@ -245,7 +246,14 @@ export function DashboardPage() {
           clientes/testers) — el cálculo sigue viniendo en kpis.ticketPromedio,
           solo se dejó de renderizar. kpiGrid2 pasa a 1 columna (ver CSS) para
           que "% Ocupación hoy" no quede con un hueco vacío al lado. */}
-      <div className={styles.kpiGrid2}>
+      <div className={`${styles.kpiGrid2} ${kpis?.porCobrarInquilinos?.inquilinos ? styles.kpiGrid2Dos : ''}`}>
+        {!!kpis?.porCobrarInquilinos?.inquilinos && (
+          <KpiCard label="Por cobrar a inquilinos" color="warn"
+            value={`RD$ ${formatMoney(kpis.porCobrarInquilinos.saldo)}`}
+            delta={{ value: `RD$ ${formatMoney(kpis.porCobrarInquilinos.generadoHoy)} generado hoy`, up: true }}
+            icon={<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>}
+          />
+        )}
         <KpiCard label="% Ocupación hoy" color="gold"
           value={`${kpis?.porcentajeOcupacion ?? 0}%`}
           icon={<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 2 4-6"/></svg>}

@@ -9,6 +9,7 @@ interface Kpis {
   ventasHoy: number; numVentasHoy: number; ventasMes: number;
   citasHoy: number; clientesNuevos: number; clientesVip: number;
   cuentasPorCobrar: number; ticketPromedio: number; porcentajeOcupacion: number;
+  porCobrarInquilinos?: { inquilinos: number; saldo: number; generadoHoy: number };
 }
 interface Rankings {
   topEmpleados: { empleadoId: string; nombre: string; ingresos: number; comisiones: number }[];
@@ -183,6 +184,13 @@ export function DashboardMobile({ kpis, rankings, serviciosMasVendidos, sucursal
           <div className={styles.kpiLabel}>Ventas mes</div>
           <div className={styles.kpiVal}>RD$ {formatMoney(kpis?.ventasMes ?? 0)}</div>
         </div>
+        {!!kpis?.porCobrarInquilinos?.inquilinos && (
+          <div className={`${styles.kpiCard} ${styles.kpiCardWide}`}>
+            <div className={styles.kpiLabel}>Por cobrar a inquilinos</div>
+            <div className={styles.kpiVal}>RD$ {formatMoney(kpis.porCobrarInquilinos.saldo)}</div>
+            <div className={styles.kpiSub}>RD$ {formatMoney(kpis.porCobrarInquilinos.generadoHoy)} generado hoy</div>
+          </div>
+        )}
       </div>
 
       {/* ─── Citas del día ─── */}
