@@ -301,6 +301,7 @@ export class DashboardService {
           this.prisma.db.venta.aggregate({
             where: {
               sucursalId: s.id,
+              ...this.ventaSinInquilinos(),
               createdAt: { gte: inicioHoy, lte: finHoy },
               estado: { not: VentaStatus.ANULADA },
             },
@@ -310,6 +311,7 @@ export class DashboardService {
           this.prisma.db.venta.aggregate({
             where: {
               sucursalId: s.id,
+              ...this.ventaSinInquilinos(),
               createdAt: { gte: inicioMes },
               estado: { not: VentaStatus.ANULADA },
             },
