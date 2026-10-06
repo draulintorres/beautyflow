@@ -52,13 +52,6 @@ export class SuperAdminController {
   }
 
   // ---------- EMPRESAS ----------
-  /** OPERACIÓN TEMPORAL (un solo uso) — se borra después de usarla. */
-  @Post('temp-borrar-usuario-huerfano')
-  @HttpCode(HttpStatus.OK)
-  borrarUsuarioHuerfanoTemporal(@Body() body: { empresaId: string; email: string }) {
-    return this.sa.borrarUsuarioHuerfanoTemporal(body.empresaId, body.email);
-  }
-
   @Get('empresas')
   listarEmpresas(@Query('estado') estado?: EmpresaStatus) {
     return this.sa.listarEmpresas({ estado });
