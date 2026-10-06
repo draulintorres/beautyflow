@@ -19,6 +19,7 @@ export class UsuariosService {
 
   async findAll() {
     const usuarios = await this.prisma.db.usuario.findMany({
+      where: { deletedAt: null },
       include: { rol: { select: { nombre: true, roleKey: true } } },
       orderBy: { nombre: 'asc' },
     });
