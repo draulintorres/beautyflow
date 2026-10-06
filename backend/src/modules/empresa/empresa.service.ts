@@ -25,7 +25,7 @@ export class EmpresaService {
         where: { id: empresaId, deletedAt: null },
         include: {
           modulos: { where: { activo: true }, select: { modulo: true } },
-          _count: { select: { sucursales: true, usuarios: true } },
+          _count: { select: { sucursales: true, usuarios: { where: { deletedAt: null } } } },
         },
       }),
       this.prisma.subscription.findUnique({
@@ -129,7 +129,7 @@ export class EmpresaService {
       data,
       include: {
         modulos: { where: { activo: true }, select: { modulo: true } },
-        _count: { select: { sucursales: true, usuarios: true } },
+        _count: { select: { sucursales: true, usuarios: { where: { deletedAt: null } } } },
       },
     });
 
