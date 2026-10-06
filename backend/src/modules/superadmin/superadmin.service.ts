@@ -352,6 +352,72 @@ export class SuperAdminService {
     return { success: true, estado: 'ACTIVA' };
   }
 
+  /** DIAGNÓSTICO TEMPORAL (solo lectura) — se borra después de usarlo. */
+  async diagnosticoChenar(nombre: string) {
+    const empresas = await this.prisma.empresa.findMany({
+      where: { nombre: { contains: nombre, mode: 'insensitive' } },
+      select: { id: true, nombre: true, slug: true, estado: true, deletedAt: true },
+    });
+    if (empresas.length !== 1) return { empresasEncontradas: empresas };
+    const empresaId = empresas[0].id;
+    const ahora = new Date();
+
+    const sub = await this.prisma.subscription.findUnique({
+      where: { empresaId },
+      select: { planId: true, status: true },
+    });
+    const plan = sub?.planId
+      ? await this.prisma.plan.findUnique({
+          where: { id: sub.planId },
+          select: { nombre: true, maxEmpleados: true, maxSucursales: true },
+        })
+      : null;
+
+    const usuarios = await this.prisma.usuario.findMany({
+      where: { empresaId, email: { in: ['victo@gmail.com'] } },
+      select: {
+        email: true, nombre: true, activo: true, deletedAt: true,
+        rol: { select: { nombre: true, roleKey: true } },
+        empleado: { select: { id: true, nombre: true } },
+      },
+    });
+
+    const empleados = await this.prisma.empleado.findMany({
+      where: { empresaId, nombre: { contains: 'vict', mode: 'insensitive' } },
+      select: {
+        id: true, nombre: true, activo: true, deletedAt: true, esCuentaDueno: true,
+        modeloPago: true, sucursal: { select: { nombre: true } },
+        alquilerConfig: { select: { tipoCuota: true, flujoDinero: true, montoPorServicio: true, montoRenta: true, periodoRenta: true, activo: true } },
+      },
+    });
+
+    const detalle = [] as any[];
+    for (const e of empleados) {
+      const [citasTotal, citasPasadas, citasFuturas, bloqueos, horarios, deudas, abonos] = await Promise.all([
+        this.prisma.cita.count({ where: { empresaId, empleadoId: e.id } }),
+        this.prisma.cita.count({ where: { empresaId, empleadoId: e.id, inicio: { lt: ahora } } }),
+        this.prisma.cita.count({ where: { empresaId, empleadoId: e.id, inicio: { gte: ahora } } }),
+        this.prisma.bloqueoHorario.count({ where: { empresaId, empleadoId: e.id } }),
+        this.prisma.empleadoHorario.count({ where: { empleadoId: e.id } }),
+        this.prisma.deudaAlquiler.count({ where: { empresaId, empleadoId: e.id } }),
+        this.prisma.abonoAlquiler.count({ where: { empresaId, deudaAlquiler: { empleadoId: e.id } } }),
+      ]);
+      detalle.push({ ...e, citas: { total: citasTotal, pasadas: citasPasadas, futuras: citasFuturas }, bloqueos, horariosActivos: horarios, deudasAlquiler: deudas, abonosAlquiler: abonos });
+    }
+
+    const empleadosActivosNoBorrados = await this.prisma.empleado.count({ where: { empresaId, deletedAt: null } });
+
+    return {
+      empresa: empresas[0],
+      suscripcion: sub,
+      plan,
+      maxEmpleados: plan?.maxEmpleados ?? null,
+      empleadosNoBorrados: empleadosActivosNoBorrados,
+      usuarioVictoGmail: usuarios,
+      empleadosConVict: detalle,
+    };
+  }
+
   async eliminarEmpresa(id: string) {
     await this.ensureEmpresa(id);
     await this.prisma.empresa.update({
