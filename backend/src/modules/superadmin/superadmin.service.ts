@@ -352,6 +352,20 @@ export class SuperAdminService {
     return { success: true, estado: 'ACTIVA' };
   }
 
+  /** OPERACIÓN TEMPORAL (un solo uso) — se borra después de usarla. */
+  async borrarUsuarioHuerfanoTemporal(empresaId: string, email: string) {
+    const u = await this.prisma.usuario.findFirst({
+      where: { empresaId, email, deletedAt: null },
+      select: { id: true, activo: true, empleado: { select: { id: true } } },
+    });
+    if (!u) throw new NotFoundException('Usuario no encontrado');
+    if (u.activo || u.empleado) {
+      throw new BadRequestException('Solo se borra un usuario desactivado y sin empleado');
+    }
+    await this.prisma.usuario.update({ where: { id: u.id }, data: { deletedAt: new Date() } });
+    return { success: true, usuarioId: u.id };
+  }
+
   async eliminarEmpresa(id: string) {
     await this.ensureEmpresa(id);
     await this.prisma.empresa.update({
