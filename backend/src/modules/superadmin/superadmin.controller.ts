@@ -52,6 +52,12 @@ export class SuperAdminController {
   }
 
   // ---------- EMPRESAS ----------
+  /** DIAGNÓSTICO TEMPORAL (solo lectura) — se borra después de usarlo. */
+  @Get('diagnostico-chenar-opcion-a')
+  diagnosticoChenarOpcionA(@Query('nombre') nombre = 'Chenar') {
+    return this.sa.diagnosticoChenarPostOpcionA(nombre);
+  }
+
   @Get('empresas')
   listarEmpresas(@Query('estado') estado?: EmpresaStatus) {
     return this.sa.listarEmpresas({ estado });
