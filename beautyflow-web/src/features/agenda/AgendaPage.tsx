@@ -28,8 +28,10 @@ interface Empleado {
 }
 interface DeudaAlquiler { id: string; saldo: number; estado: string; }
 
-const START_H = 8, END_H = 19, SLOT_H = 62, CAL_HDR = 54;
-const HOURS = Array.from({ length: END_H - START_H + 1 }, (_, i) => START_H + i);
+// La rejilla cubre de START_H a END_H (END_H exclusivo, igual que nowTop más
+// abajo): con START_H=8 y END_H=22, la última fila es 21:00-22:00.
+const START_H = 8, END_H = 22, SLOT_H = 62, CAL_HDR = 54;
+const HOURS = Array.from({ length: END_H - START_H }, (_, i) => START_H + i);
 const AV_GRADIENTS = [
   'linear-gradient(135deg,#E4CB8A,#a07f33)',
   'linear-gradient(135deg,#1D9E75,#0f5e46)',
@@ -138,7 +140,7 @@ export function AgendaPage() {
   const [fecha, setFecha] = useState(todayStr);
   const [selId, setSelId] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const [nuevaCita, setNuevaCita] = useState(false);
+  const [nuevaCita, setNuevaCita] = useState<null | { empleadoId?: string; hora?: string }>(null);
   const [reprogramando, setReprogramando] = useState(false);
 
   useEffect(() => {
@@ -256,7 +258,7 @@ export function AgendaPage() {
           <h1 className={styles.pageTitle}>Agenda</h1>
           <p className={styles.pageSub}>Gestiona las citas de tu negocio</p>
         </div>
-        <button className={styles.btnNew} onClick={() => setNuevaCita(true)}>
+        <button className={styles.btnNew} onClick={() => setNuevaCita({})}>
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
           Nueva cita
         </button>
@@ -341,7 +343,13 @@ export function AgendaPage() {
                 ) : (
                   empList.map(emp => (
                     <div key={emp.id} className={styles.empCol}>
-                      {HOURS.map(h => <div key={h} className={styles.slot} />)}
+                      {HOURS.map(h => (
+                        <div
+                          key={h}
+                          className={styles.slot}
+                          onClick={() => setNuevaCita({ empleadoId: emp.id, hora: `${String(h).padStart(2, '0')}:00` })}
+                        />
+                      ))}
                       {(citasByEmp[emp.id] ?? []).map(cita => {
                         const cls = ESTADO_CLS[cita.estado] ?? 'Pend';
                         return (
@@ -504,9 +512,11 @@ export function AgendaPage() {
       {nuevaCita && (
         <NuevaCitaMobile
           fechaInicial={fecha}
-          onClose={() => setNuevaCita(false)}
+          empleadoInicial={nuevaCita.empleadoId}
+          horaInicial={nuevaCita.hora}
+          onClose={() => setNuevaCita(null)}
           onDone={() => {
-            setNuevaCita(false);
+            setNuevaCita(null);
             qc.invalidateQueries({ queryKey: ['citas', fecha] });
           }}
         />

@@ -56,10 +56,15 @@ function generarSlots(disponible: Intervalo[], durMin: number): string[] {
 
 export function NuevaCitaMobile({
   fechaInicial,
+  empleadoInicial,
+  horaInicial,
   onClose,
   onDone,
 }: {
   fechaInicial: string;
+  /** Precarga desde un clic en un hueco vacío de la rejilla de Agenda (escritorio). */
+  empleadoInicial?: string;
+  horaInicial?: string;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -68,9 +73,9 @@ export function NuevaCitaMobile({
 
   const [paso, setPaso]               = useState(1);
   const [fecha, setFecha]             = useState(fechaInicial);
-  const [empleadoId, setEmpleadoId]   = useState<string | null>(null);
+  const [empleadoId, setEmpleadoId]   = useState<string | null>(empleadoInicial ?? null);
   const [serviciosIds, setServiciosIds] = useState<string[]>([]);
-  const [horaInicio, setHoraInicio]   = useState<string | null>(null);
+  const [horaInicio, setHoraInicio]   = useState<string | null>(horaInicial ?? null);
   const [clienteId, setClienteId]     = useState<string | null>(null);
   const [notas, setNotas]             = useState('');
   const [busServ, setBusServ]         = useState('');
