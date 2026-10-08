@@ -81,6 +81,7 @@ export function NuevaCitaMobile({
   const [busServ, setBusServ]         = useState('');
   const [busCli, setBusCli]           = useState('');
   const [errMsg, setErrMsg]           = useState<string | null>(null);
+  const [avisoHora, setAvisoHora]     = useState<string | null>(null);
 
   // ─── Queries (se cachean globalmente) ───
   const { data: empleados = [] } = useQuery<Empleado[]>({
@@ -169,12 +170,30 @@ export function NuevaCitaMobile({
   const clienteSel  = clientes.find(c => c.id === clienteId);
   const fechaObj    = new Date(`${fecha}T00:00:00`);
 
+  // Si viene precargada desde un clic en un hueco vacío de la Agenda (o si
+  // el usuario ya eligió una hora y cambia de servicios), no la borramos a
+  // ciegas: solo se limpia cuando deja de caber para la duración actual —
+  // misma validación que ya usa el paso 3 para pintar los botones de hora
+  // (`slots`), así que nunca queda seleccionada una hora que no se vaya a
+  // mostrar como tal.
+  useEffect(() => {
+    // duracionTotal > 0: sin servicios elegidos todavía (recién abierto
+    // desde un clic en la Agenda) `slots` sale vacío porque no hay nada que
+    // calcular — eso no significa que la hora precargada sea inválida, solo
+    // que aún no se puede validar. Se revisa de verdad recién cuando ya hay
+    // un servicio elegido.
+    if (horaInicio && duracionTotal > 0 && !slots.includes(horaInicio)) {
+      setHoraInicio(null);
+      setAvisoHora('La hora ya no está disponible para esta duración. Elige otra.');
+    }
+  }, [slots, horaInicio, duracionTotal]);
+
   // ─── Handlers ───
-  function cambiarFecha(f: string) { setFecha(f); setHoraInicio(null); }
-  function cambiarEmpleado(id: string) { setEmpleadoId(id); setHoraInicio(null); }
+  function cambiarFecha(f: string) { setFecha(f); setHoraInicio(null); setAvisoHora(null); }
+  function cambiarEmpleado(id: string) { setEmpleadoId(id); setHoraInicio(null); setAvisoHora(null); }
   function toggleServicio(id: string) {
     setServiciosIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-    setHoraInicio(null);
+    setAvisoHora(null);
   }
 
   const crearCita = useMutation({
@@ -369,6 +388,7 @@ export function NuevaCitaMobile({
                   <span>RD$ {formatMoney(precioEstimado)}</span>
                 </div>
               )}
+              {avisoHora && <div className={styles.errMsg}>{avisoHora}</div>}
             </>
           )}
 
@@ -411,7 +431,7 @@ export function NuevaCitaMobile({
                     <button
                       key={slot}
                       className={`${styles.slot} ${horaInicio === slot ? styles.slotSel : ''}`}
-                      onClick={() => setHoraInicio(slot)}
+                      onClick={() => { setHoraInicio(slot); setAvisoHora(null); }}
                     >
                       {toAmPm(slot)}
                     </button>
