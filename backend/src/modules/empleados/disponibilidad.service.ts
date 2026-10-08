@@ -175,6 +175,40 @@ export class DisponibilidadService {
   }
 
   /**
+   * Como estaDisponible(), pero cuando el intervalo no cabe, distingue la
+   * causa — Agenda necesita mensajes distintos para cada una:
+   *   'FUERA_DE_HORARIO': el empleado no trabaja ese día (sin horario activo,
+   *     vacaciones, no participa en agenda), o el intervalo se sale del
+   *     horaInicio/horaFin de su jornada (incluye terminar después del
+   *     cierre, aunque empiece dentro).
+   *   'CHOQUE': el intervalo cabe en la jornada pero se solapa con otra
+   *     cita o un bloqueo.
+   * Reutiliza la misma consulta que estaDisponible() (getDisponibilidad),
+   * así que no le agrega una vuelta extra a la base.
+   */
+  async motivoNoDisponible(
+    empleadoId: string,
+    inicio: Date,
+    fin: Date,
+    excluirCitaId?: string,
+  ): Promise<'FUERA_DE_HORARIO' | 'CHOQUE' | null> {
+    const fecha = inicio.toISOString().slice(0, 10);
+    const disp = await this.getDisponibilidad(empleadoId, fecha, excluirCitaId);
+    if (!disp.trabaja) return 'FUERA_DE_HORARIO';
+
+    const ini = this.dateToMin(inicio);
+    const end = this.dateToMin(fin);
+    const jornadaIni = this.toMin(disp.horaInicio!);
+    const jornadaFin = this.toMin(disp.horaFin!);
+    if (ini < jornadaIni || end > jornadaFin) return 'FUERA_DE_HORARIO';
+
+    const cabe = disp.disponible.some(
+      (slot) => this.toMin(slot.inicio) <= ini && this.toMin(slot.fin) >= end,
+    );
+    return cabe ? null : 'CHOQUE';
+  }
+
+  /**
    * Devuelve una cabina libre en el rango dado dentro de la sucursal,
    * o null si todas están ocupadas. Usado cuando un servicio requiere cabina.
    */

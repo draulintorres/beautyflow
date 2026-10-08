@@ -134,12 +134,17 @@ export class AgendaService {
     const fin = new Date(inicio.getTime() + duracionTotal * 60_000);
 
     // 4. Anti-solapamiento del empleado (regla más importante)
-    const libre = await this.disponibilidad.estaDisponible(
+    const motivo = await this.disponibilidad.motivoNoDisponible(
       empleadoId,
       inicio,
       fin,
     );
-    if (!libre) {
+    if (motivo === 'FUERA_DE_HORARIO') {
+      throw new ConflictException(
+        'Esa hora está fuera del horario de trabajo de este empleado. Ajusta su horario en Equipo → Horarios o elige otra hora.',
+      );
+    }
+    if (motivo === 'CHOQUE') {
       throw new ConflictException(
         'El empleado ya tiene una cita o bloqueo en ese horario',
       );
@@ -468,13 +473,18 @@ export class AgendaService {
     const fin = new Date(inicio.getTime() + duracionTotal * 60_000);
 
     // Anti-solapamiento excluyendo la propia cita
-    const libre = await this.disponibilidad.estaDisponible(
+    const motivo = await this.disponibilidad.motivoNoDisponible(
       empleadoId,
       inicio,
       fin,
       id,
     );
-    if (!libre) {
+    if (motivo === 'FUERA_DE_HORARIO') {
+      throw new ConflictException(
+        'Esa hora está fuera del horario de trabajo de este empleado. Ajusta su horario en Equipo → Horarios o elige otra hora.',
+      );
+    }
+    if (motivo === 'CHOQUE') {
       throw new ConflictException(
         'El empleado ya tiene una cita o bloqueo en ese horario',
       );
