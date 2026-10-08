@@ -1014,9 +1014,9 @@ function IntegranteDrawer({
   const [espErr, setEspErr] = useState('');
 
   const { data: detalle } = useQuery<IntegranteDetalle>({
-    queryKey: ['equipo-detalle', data?.id],
-    queryFn: () => api.get(`/empleados/${data!.id}`).then(r => r.data),
-    enabled: !!data?.id,
+    queryKey: ['equipo-detalle', savedId],
+    queryFn: () => api.get(`/empleados/${savedId}`).then(r => r.data),
+    enabled: !!savedId,
   });
 
   useEffect(() => {
@@ -1239,6 +1239,10 @@ function IntegranteDrawer({
                 <div className={styles.loadWrap}><div className={styles.spinner} /></div>
               ) : (
                 <>
+                  <p className={styles.espHint}>
+                    Dejamos un horario inicial de 8:00 a. m. a 10:00 p. m., de lunes a domingo.
+                    Ajústalo a lo que realmente trabaja este empleado y guarda los cambios.
+                  </p>
                   <div className={styles.horariosGrid}>
                     {DIAS.map(d => (
                       <div key={d.n} className={`${styles.horarioRow} ${horarios[d.n]?.activo ? styles.horarioRowActive : ''}`}>

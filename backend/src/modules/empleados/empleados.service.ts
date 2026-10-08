@@ -29,6 +29,14 @@ import { randomBytes } from 'crypto';
 export class EmpleadosService {
   private readonly frontendUrl: string;
 
+  // Horario con el que nace todo empleado "real" nuevo (no el fantasma del
+  // dueño): sin esto, un empleado recién creado sale como "no trabaja ese
+  // día" en disponibilidad.service.ts hasta que alguien entra a Horarios y
+  // guarda — confunde a dueños armando su equipo por primera vez. Son solo
+  // un punto de partida; el negocio los ajusta desde Equipo cuando quiera.
+  private static readonly HORARIO_DEFAULT_INICIO = '08:00';
+  private static readonly HORARIO_DEFAULT_FIN = '22:00';
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly limits: LimitsService,
@@ -98,16 +106,38 @@ export class EmpleadosService {
       await this.validateSucursal(dto.sucursalId);
     }
 
-    return this.prisma.db.empleado.create({
-      data: {
-        nombre: dto.nombre,
-        telefono: dto.telefono,
-        puesto: dto.puesto,
-        sucursalId: dto.sucursalId,
-        usuarioId: dto.usuarioId,
-        activo: dto.activo ?? true,
-        ...(dto.participaAgenda !== undefined && { participaAgenda: dto.participaAgenda }),
-      } as any,
+    const empresaId = getEmpresaId();
+
+    // Transacción: el empleado y sus 7 filas de horario nacen juntos — si
+    // algo falla no debe quedar un empleado sin horario ni horarios
+    // huérfanos. `tx` es el cliente crudo de Prisma (sin el wrapper
+    // `prisma.db` que inyecta empresaId), así que acá empresaId va a mano,
+    // igual que en empleados.service.ts#crearAcceso.
+    return this.prisma.$transaction(async (tx) => {
+      const empleado = await tx.empleado.create({
+        data: {
+          empresaId,
+          nombre: dto.nombre,
+          telefono: dto.telefono,
+          puesto: dto.puesto,
+          sucursalId: dto.sucursalId,
+          usuarioId: dto.usuarioId,
+          activo: dto.activo ?? true,
+          ...(dto.participaAgenda !== undefined && { participaAgenda: dto.participaAgenda }),
+        } as any,
+      });
+
+      await tx.empleadoHorario.createMany({
+        data: Array.from({ length: 7 }, (_, diaSemana) => ({
+          empleadoId: empleado.id,
+          diaSemana,
+          horaInicio: EmpleadosService.HORARIO_DEFAULT_INICIO,
+          horaFin: EmpleadosService.HORARIO_DEFAULT_FIN,
+          activo: true,
+        })),
+      });
+
+      return empleado;
     });
   }
 
