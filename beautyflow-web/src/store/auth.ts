@@ -26,6 +26,10 @@ export interface AuthEmpresa {
   /** % de ITBIS de la empresa (0 si no es contribuyente DGII). Usado por
    * el POS para estimar el total antes de cobrar. */
   itbisPct?: number;
+  /** Si la Agenda del equipo (dueño, admin, recepción, etc.) muestra
+   * también las citas de los inquilinos (Alquiler de Silla). El propio
+   * inquilino siempre ve la suya — esto no lo afecta a él. */
+  verAgendaInquilinos?: boolean;
 }
 
 interface AuthState {

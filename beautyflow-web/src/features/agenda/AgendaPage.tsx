@@ -25,6 +25,10 @@ interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean;
   esCuentaDueno?: boolean;
   usuario?: { id: string } | null;
+  // Ajuste "ver agenda de inquilinos": mismo criterio que
+  // dashboard.service.ts#INQUILINO_WHERE.
+  modeloPago?: string;
+  alquilerConfig?: { activo: boolean } | null;
 }
 interface DeudaAlquiler { id: string; saldo: number; estado: string; }
 
@@ -56,6 +60,12 @@ const MESES_C = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','no
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// Mismo criterio que dashboard.service.ts#INQUILINO_WHERE: modeloPago
+// ALQUILER con alquilerConfig activa.
+function esInquilinoAgenda(e?: { modeloPago?: string; alquilerConfig?: { activo: boolean } | null }) {
+  return e?.modeloPago === 'ALQUILER' && e?.alquilerConfig?.activo === true;
 }
 function stepFecha(fecha: string, delta: number) {
   const d = new Date(fecha + 'T12:00:00');
@@ -160,6 +170,26 @@ export function AgendaPage() {
     queryKey: ['citas', fecha],
     queryFn: () => api.get('/citas', { params: { fecha } }).then(r => r.data),
   });
+
+  // Ajuste de empresa "ver agenda de inquilinos" (Ajustes, exclusivo de
+  // OWNER para cambiarlo). El propio inquilino siempre ve la suya — este
+  // ajuste nunca lo afecta a él. Para cualquier otro rol, con el ajuste
+  // apagado, se filtra ANTES de calcular columnas, contadores, la red de
+  // seguridad y el panel lateral — así la red de seguridad nunca puede
+  // resucitar una columna de inquilino (ver empList más abajo: si su cita
+  // ya no está en `citasVisibles`, nunca entra a la lista de "citas sin
+  // columna" que arma columnas extra).
+  const verAgendaInquilinos = useAuthStore(s => s.empresa?.verAgendaInquilinos ?? false);
+  const ocultarInquilinos = !soyInquilino && !verAgendaInquilinos;
+  const empleadosVisibles = useMemo(
+    () => ocultarInquilinos ? empleados.filter(e => !esInquilinoAgenda(e)) : empleados,
+    [empleados, ocultarInquilinos],
+  );
+  const citasVisibles = useMemo(() => {
+    if (!ocultarInquilinos) return citas;
+    const idsInquilinos = new Set(empleados.filter(esInquilinoAgenda).map(e => e.id));
+    return citas.filter(c => !c.empleado || !idsInquilinos.has(c.empleado.id));
+  }, [citas, empleados, ocultarInquilinos]);
   // "Ingreso de hoy": dinero REAL (ventas PAGADA), a diferencia de
   // "Ingreso esperado" (proyección de citas, calculado abajo sin tocar).
   // El backend filtra quién ve qué (inquilino, salón o su propio ingreso).
@@ -179,7 +209,7 @@ export function AgendaPage() {
     [misDeudas],
   );
 
-  const selCita = citas.find(c => c.id === selId) ?? null;
+  const selCita = citasVisibles.find(c => c.id === selId) ?? null;
   const clienteId = selCita?.cliente?.id ?? null;
   const { data: historial = [] } = useQuery<Cita[]>({
     queryKey: ['cliente-citas', clienteId],
@@ -199,12 +229,12 @@ export function AgendaPage() {
   });
 
   const stats = useMemo(() => ({
-    total: citas.length,
-    confirmadas: citas.filter(c => c.estado === 'CONFIRMADA').length,
-    pendientes: citas.filter(c => c.estado === 'PENDIENTE').length,
-    canceladas: citas.filter(c => c.estado === 'CANCELADA').length,
-    ingreso: citas.filter(c => !TERMINALES.includes(c.estado)).reduce((s, c) => s + c.total, 0),
-  }), [citas]);
+    total: citasVisibles.length,
+    confirmadas: citasVisibles.filter(c => c.estado === 'CONFIRMADA').length,
+    pendientes: citasVisibles.filter(c => c.estado === 'PENDIENTE').length,
+    canceladas: citasVisibles.filter(c => c.estado === 'CANCELADA').length,
+    ingreso: citasVisibles.filter(c => !TERMINALES.includes(c.estado)).reduce((s, c) => s + c.total, 0),
+  }), [citasVisibles]);
 
   const isToday = fecha === todayStr();
   const nowHour = now.getHours();
@@ -216,7 +246,10 @@ export function AgendaPage() {
   const empList = useMemo<(Empleado & { extraLabel?: string })[]>(() => {
     // esCuentaDueno excluido: no es personal bookable (ver mismo criterio
     // en NuevaCitaMobile.tsx) -- no tiene sentido como columna del calendario.
-    let base = empleados.filter(e => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
+    // empleadosVisibles ya excluyó a los inquilinos si el ajuste está apagado
+    // (y nunca para el propio inquilino) — por eso uno jamás llega como
+    // columna normal en ese caso.
+    let base = empleadosVisibles.filter(e => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
     // Alquiler de silla: cortesía visual — el inquilino solo ve su propia
     // columna (el backend ya filtra las citas; esto evita listar nombres
     // de otros empleados en el calendario de alguien que es un negocio
@@ -227,9 +260,11 @@ export function AgendaPage() {
     if (fromDB.length === 0) {
       // Sin ningún empleado real activo: mismo comportamiento de siempre,
       // arma columnas directo desde las citas del día (puede incluir al
-      // dueño — no hay otra forma de mostrar nada ese día).
+      // dueño — no hay otra forma de mostrar nada ese día). citasVisibles
+      // ya no trae citas de inquilinos si el ajuste está apagado, así que
+      // uno nunca puede colarse por acá tampoco.
       const map = new Map<string, Empleado>();
-      for (const c of citas) {
+      for (const c of citasVisibles) {
         if (c.empleado && !map.has(c.empleado.id)) {
           map.set(c.empleado.id, { id: c.empleado.id, nombre: c.empleado.nombre, activo: true, participaAgenda: true });
         }
@@ -241,13 +276,16 @@ export function AgendaPage() {
     // empleados desactivados, o el 7º empleado en adelante). Columnas extra,
     // solo para este día, siempre al final. Un inquilino nunca ve columnas
     // de nadie más — ni siquiera esta red de seguridad se activa para él.
+    // Con el ajuste apagado, citasVisibles ya excluyó las citas de
+    // inquilinos, así que esta red de seguridad tampoco puede resucitarlas
+    // como columna extra.
     const columnas: (Empleado & { extraLabel?: string })[] = [...fromDB];
     if (!soyInquilino) {
       const idsConColumna = new Set(columnas.map(e => e.id));
       const extras = new Map<string, Empleado & { extraLabel?: string }>();
-      for (const c of citas) {
+      for (const c of citasVisibles) {
         if (!c.empleado || idsConColumna.has(c.empleado.id) || extras.has(c.empleado.id)) continue;
-        const real = empleados.find(e => e.id === c.empleado!.id);
+        const real = empleadosVisibles.find(e => e.id === c.empleado!.id);
         const extraLabel = real?.esCuentaDueno
           ? '(dueño)'
           : real && (!real.activo || real.participaAgenda === false)
@@ -264,16 +302,16 @@ export function AgendaPage() {
       columnas.push(...extras.values());
     }
     return columnas;
-  }, [empleados, citas, soyInquilino, authUser]);
+  }, [empleadosVisibles, citasVisibles, soyInquilino, authUser]);
 
   const citasByEmp = useMemo(() => {
     const m: Record<string, Cita[]> = {};
     for (const emp of empList) m[emp.id] = [];
-    for (const c of citas) {
+    for (const c of citasVisibles) {
       if (c.empleado && m[c.empleado.id]) m[c.empleado.id].push(c);
     }
     return m;
-  }, [empList, citas]);
+  }, [empList, citasVisibles]);
 
   const histPrev = historial
     .filter(c => c.fecha < fecha && !TERMINALES.includes(c.estado))
@@ -558,7 +596,7 @@ export function AgendaPage() {
       {reprogramando && selCita && (
         <ReprogramarModal
           cita={selCita}
-          empleados={empleados}
+          empleados={empleadosVisibles}
           soyInquilino={soyInquilino}
           onClose={() => setReprogramando(false)}
           onSuccess={() => {

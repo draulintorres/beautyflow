@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, downloadPdf } from '../../lib/api';
@@ -18,7 +18,11 @@ interface Cita {
   // ACTIVA ligada.
   venta?: { id: string; estado: string } | null;
 }
-interface Empleado { id: string; nombre: string; activo: boolean; participaAgenda: boolean; esCuentaDueno?: boolean; }
+interface Empleado {
+  id: string; nombre: string; activo: boolean; participaAgenda: boolean; esCuentaDueno?: boolean;
+  modeloPago?: string;
+  alquilerConfig?: { activo: boolean } | null;
+}
 
 type Filtro = 'TODAS' | 'CONFIRMADA' | 'PENDIENTE' | 'EN_PROCESO' | 'CANCELADA';
 
@@ -40,6 +44,10 @@ function toAmPm(hhmm: string): string {
 }
 
 function toISO(d: Date) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+// Mismo criterio que dashboard.service.ts#INQUILINO_WHERE.
+function esInquilinoAgenda(e?: { modeloPago?: string; alquilerConfig?: { activo: boolean } | null }) {
+  return e?.modeloPago === 'ALQUILER' && e?.alquilerConfig?.activo === true;
+}
 const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
@@ -81,22 +89,38 @@ export function AgendaMobile() {
   });
   const ingresoHoy = ingresoHoyData?.ingresoHoy ?? 0;
 
-  const ordenadas = [...citas].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+  // Ajuste de empresa "ver agenda de inquilinos" — mismo criterio que
+  // AgendaPage.tsx (escritorio): el propio inquilino siempre ve la suya;
+  // para cualquier otro rol, con el ajuste apagado se filtra ANTES de
+  // calcular contadores y la lista.
+  const verAgendaInquilinos = useAuthStore(s => s.empresa?.verAgendaInquilinos ?? false);
+  const ocultarInquilinos = !soyInquilino && !verAgendaInquilinos;
+  const empleadosVisibles = useMemo(
+    () => ocultarInquilinos ? empleados.filter(e => !esInquilinoAgenda(e)) : empleados,
+    [empleados, ocultarInquilinos],
+  );
+  const citasVisibles = useMemo(() => {
+    if (!ocultarInquilinos) return citas;
+    const idsInquilinos = new Set(empleados.filter(esInquilinoAgenda).map(e => e.id));
+    return citas.filter(c => !c.empleado || !idsInquilinos.has(c.empleado.id));
+  }, [citas, empleados, ocultarInquilinos]);
+
+  const ordenadas = [...citasVisibles].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
   const visibles = ordenadas.filter(c => filtro === 'TODAS' ? true : c.estado === filtro);
 
-  const noCanceladas = citas.filter(c => c.estado !== 'CANCELADA');
+  const noCanceladas = citasVisibles.filter(c => c.estado !== 'CANCELADA');
   const resumen = {
-    citasHoy: citas.length,
-    pendientes: citas.filter(c => c.estado === 'PENDIENTE').length,
+    citasHoy: citasVisibles.length,
+    pendientes: citasVisibles.filter(c => c.estado === 'PENDIENTE').length,
     proyectado: noCanceladas.reduce((s, c) => s + (c.total ?? 0), 0),
-    clientes: new Set(citas.map(c => c.cliente?.id).filter((id): id is string => Boolean(id))).size,
+    clientes: new Set(citasVisibles.map(c => c.cliente?.id).filter((id): id is string => Boolean(id))).size,
   };
   const conteos: Record<Filtro, number> = {
-    TODAS: citas.length,
-    CONFIRMADA: citas.filter(c => c.estado === 'CONFIRMADA').length,
-    PENDIENTE: citas.filter(c => c.estado === 'PENDIENTE').length,
-    EN_PROCESO: citas.filter(c => c.estado === 'EN_PROCESO').length,
-    CANCELADA: citas.filter(c => c.estado === 'CANCELADA').length,
+    TODAS: citasVisibles.length,
+    CONFIRMADA: citasVisibles.filter(c => c.estado === 'CONFIRMADA').length,
+    PENDIENTE: citasVisibles.filter(c => c.estado === 'PENDIENTE').length,
+    EN_PROCESO: citasVisibles.filter(c => c.estado === 'EN_PROCESO').length,
+    CANCELADA: citasVisibles.filter(c => c.estado === 'CANCELADA').length,
   };
 
   // 7 días centrados en hoy
@@ -337,7 +361,7 @@ export function AgendaMobile() {
       {sel && reprog && (
         <ReprogramarModal
           cita={sel}
-          empleados={empleados}
+          empleados={empleadosVisibles}
           soyInquilino={soyInquilino}
           onClose={() => setReprog(false)}
           onSuccess={() => {

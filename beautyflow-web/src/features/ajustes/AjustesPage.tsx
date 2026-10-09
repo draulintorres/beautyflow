@@ -39,6 +39,7 @@ interface EmpresaAjustes {
   itbisPct: number;
   pinAnulacionActivo: boolean;
   pinAnulacionConfigurado: boolean;
+  verAgendaInquilinos: boolean;
 }
 
 const errMsg = (e: unknown) => {
@@ -113,6 +114,7 @@ export function AjustesPage() {
     minutosAvisoCita: 30,
     itbisPct: 18,
     pinAnulacionActivo: false,
+    verAgendaInquilinos: false,
   });
   // PIN nuevo: campo transitorio, nunca se precarga con el valor del
   // servidor (el backend jamás devuelve el PIN, solo si ya hay uno
@@ -131,6 +133,7 @@ export function AjustesPage() {
       minutosAvisoCita: empresa.minutosAvisoCita ?? 30,
       itbisPct: empresa.itbisPct ?? 18,
       pinAnulacionActivo: empresa.pinAnulacionActivo ?? false,
+      verAgendaInquilinos: empresa.verAgendaInquilinos ?? false,
     });
   }, [empresa]);
 
@@ -158,6 +161,10 @@ export function AjustesPage() {
         // backend rechazaría con 403.
         ...(esOwner && { pinAnulacionActivo: form.pinAnulacionActivo }),
         ...(esOwner && pinNuevo && { pinAnulacion: pinNuevo }),
+        // Ver agenda de inquilinos: mismo criterio — EXCLUSIVO de OWNER,
+        // no se manda si no lo es, para no reenviar sin querer un valor
+        // que el backend rechazaría con 403.
+        ...(esOwner && { verAgendaInquilinos: form.verAgendaInquilinos }),
       }).then((r) => r.data),
     onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ['empresa-info'] });
@@ -496,6 +503,30 @@ export function AjustesPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {esOwner && (
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Agenda</h2>
+          <div className={styles.toggleSection}>
+            <div className={styles.toggleRow}>
+              <div className={styles.toggleInfo}>
+                <span className={styles.toggleLabel}>Ver la agenda de inquilinos</span>
+                <span className={styles.toggleHint}>
+                  Si está activado, verás en tu agenda las citas de los inquilinos (quienes alquilan silla). Si no, solo verás a tu equipo.
+                </span>
+              </div>
+              <label className={styles.toggleSwitch}>
+                <input
+                  type="checkbox"
+                  checked={form.verAgendaInquilinos}
+                  onChange={(e) => set('verAgendaInquilinos', e.target.checked)}
+                />
+                <span className={styles.toggleTrack} />
+              </label>
+            </div>
+          </div>
         </div>
       )}
 

@@ -10,6 +10,8 @@ interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean;
   esCuentaDueno?: boolean;
   usuario?: { id: string } | null;
+  modeloPago?: string;
+  alquilerConfig?: { activo: boolean } | null;
 }
 interface Servicio { id: string; nombre: string; precio: string; duracionMin: number; categoria?: { nombre: string }; activo: boolean; }
 interface Cliente { id: string; nombre: string; telefono?: string; whatsapp?: string; }
@@ -25,6 +27,10 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 
 function toISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+// Mismo criterio que dashboard.service.ts#INQUILINO_WHERE.
+function esInquilinoAgenda(e?: { modeloPago?: string; alquilerConfig?: { activo: boolean } | null }) {
+  return e?.modeloPago === 'ALQUILER' && e?.alquilerConfig?.activo === true;
 }
 function toMin(hhmm: string) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -167,7 +173,16 @@ export function NuevaCitaMobile({
   // (resolveEmpleadoRegistra, en el POS). Dejar "Empleado" sin elegir es
   // justamente cómo se agenda el dueño a sí mismo (ver empleadoIdEfectivo
   // arriba) — no tiene que aparecer en la lista para eso.
-  const empleadosActivos   = empleados.filter(e => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
+  // Ajuste "ver agenda de inquilinos": si está apagado, tampoco se ofrecen
+  // como opción — si no, el dueño agendaría una cita invisible en su
+  // propia rejilla. El propio inquilino nunca pasa por acá para sí mismo
+  // (soyInquilino tiene su propia rama más abajo en el render).
+  const verAgendaInquilinos = useAuthStore(s => s.empresa?.verAgendaInquilinos ?? false);
+  const ocultarInquilinos = !soyInquilino && !verAgendaInquilinos;
+  const empleadosActivos   = empleados.filter(e =>
+    e.activo && e.participaAgenda !== false && !e.esCuentaDueno &&
+    !(ocultarInquilinos && esInquilinoAgenda(e)),
+  );
   const serviciosFiltrados = servicios.filter(s =>
     s.activo && s.nombre.toLowerCase().includes(busServ.toLowerCase())
   );
