@@ -307,6 +307,11 @@ export class AuthService {
         // cobrar — debe coincidir con lo que ventas.service.ts calculará
         // al confirmar la venta.
         itbisPct: Number(usuario.empresa.itbisPct),
+        // Ajuste de Agenda (ver citas de inquilinos): expuesto aquí (no solo
+        // en GET /empresa, que es OWNER/ADMIN-only vía @Modulos) porque la
+        // Agenda lo necesita para CUALQUIER rol que la abra, inquilino
+        // incluido — aunque solo OWNER pueda cambiarlo desde Ajustes.
+        verAgendaInquilinos: usuario.empresa.verAgendaInquilinos,
       },
       empleadoId: usuario.empleado?.id ?? null,
     };

@@ -280,6 +280,15 @@ model Empresa {
   pinAnulacionActivo Boolean @default(false) @map("pin_anulacion_activo")
   pinAnulacionHash   String? @map("pin_anulacion_hash")
 
+  // Ajuste de Agenda: si el dueño/equipo ve en su propia Agenda las citas
+  // de los inquilinos (Alquiler de Silla) o no. Apagado por defecto (en
+  // empresas nuevas y existentes) — un inquilino es un negocio
+  // independiente dentro del salón, así que por defecto su agenda no se
+  // mezcla con la del equipo. El propio inquilino SIEMPRE ve la suya,
+  // pase lo que pase este valor (ver agenda.service.ts). Exclusivo de
+  // OWNER para cambiarlo, igual que pinAnulacionActivo e itbisPct arriba.
+  verAgendaInquilinos Boolean @default(false) @map("ver_agenda_inquilinos")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")

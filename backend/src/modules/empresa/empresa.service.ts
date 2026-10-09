@@ -80,6 +80,20 @@ export class EmpresaService {
       }
     }
 
+    // Ver agenda de inquilinos: mismo criterio que el PIN y el ITBIS —
+    // exclusivo de OWNER, ni siquiera ADMIN (que sí puede editar el resto
+    // de Ajustes). El frontend ya no renderiza este campo para nadie más,
+    // pero esto es lo que de verdad lo hace cumplir si alguien llama a la
+    // API directo.
+    if (dto.verAgendaInquilinos !== undefined) {
+      const user = getCurrentUser();
+      if (user.rol !== 'OWNER') {
+        throw new ForbiddenException(
+          'Solo el propietario (OWNER) puede cambiar si se ve la agenda de los inquilinos.',
+        );
+      }
+    }
+
     const data: Prisma.EmpresaUpdateInput = {
       ...(dto.nombre !== undefined && { nombre: dto.nombre }),
       ...(dto.rnc !== undefined && { rnc: dto.rnc }),
@@ -114,6 +128,9 @@ export class EmpresaService {
       }),
       ...(dto.pinAnulacionActivo !== undefined && {
         pinAnulacionActivo: dto.pinAnulacionActivo,
+      }),
+      ...(dto.verAgendaInquilinos !== undefined && {
+        verAgendaInquilinos: dto.verAgendaInquilinos,
       }),
     };
 
@@ -177,6 +194,7 @@ export class EmpresaService {
       // si es "definir" o "cambiar" sin nunca ver el valor real).
       pinAnulacionActivo: e.pinAnulacionActivo,
       pinAnulacionConfigurado: !!e.pinAnulacionHash,
+      verAgendaInquilinos: e.verAgendaInquilinos,
       plan: e.plan,
       estado: e.estado,
       modulosActivos: e.modulos?.map((m: any) => m.modulo) ?? [],

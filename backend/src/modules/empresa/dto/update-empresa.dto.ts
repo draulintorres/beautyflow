@@ -140,4 +140,9 @@ export class UpdateEmpresaDto {
     message: 'El PIN debe ser numérico, de 4 a 8 dígitos',
   })
   pinAnulacion?: string;
+
+  // ---- Agenda: ver citas de inquilinos (Alquiler de Silla) ----
+  @IsOptional()
+  @IsBoolean()
+  verAgendaInquilinos?: boolean;
 }

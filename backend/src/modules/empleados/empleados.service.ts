@@ -66,6 +66,12 @@ export class EmpleadosService {
         },
         _count: { select: { especialidades: true } },
         especialidades: { select: { servicio: { select: { id: true, nombre: true } } } },
+        // Ajuste "ver agenda de inquilinos": el frontend necesita saber si
+        // cada empleado es inquilino (modeloPago ALQUILER + config activa,
+        // mismo criterio que dashboard.service.ts#INQUILINO_WHERE) para
+        // poder ocultarlo de Agenda. `modeloPago` ya viene (es escalar);
+        // esto agrega la relación que faltaba.
+        alquilerConfig: { select: { activo: true } },
       },
       orderBy: { nombre: 'asc' },
     });
