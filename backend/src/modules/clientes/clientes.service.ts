@@ -169,7 +169,11 @@ export class ClientesService {
     const citas = await this.prisma.db.cita.findMany({
       where: { clienteId: id, ...suc },
       include: {
-        empleado: { select: { nombre: true } },
+        // id agregado (aditivo): el panel lateral de Agenda lo necesita
+        // para saber si esta cita es de un inquilino y poder ocultarla
+        // con el ajuste "ver agenda de inquilinos" apagado — antes solo
+        // traía el nombre, sin forma de cruzarlo contra /empleados.
+        empleado: { select: { id: true, nombre: true } },
         servicios: {
           include: { servicio: { select: { nombre: true } } },
         },
@@ -182,6 +186,7 @@ export class ClientesService {
       fecha: c.inicio.toISOString().slice(0, 10),
       servicios: c.servicios.map((s) => s.servicio?.nombre).filter(Boolean),
       empleado: c.empleado?.nombre,
+      empleadoId: c.empleado?.id,
       estado: ENUM_TO_ESTADO_ES[c.estado as CitaStatus],
       total: Number(c.total),
     }));
