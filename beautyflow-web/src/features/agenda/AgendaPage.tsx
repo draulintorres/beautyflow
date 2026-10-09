@@ -31,6 +31,15 @@ interface Empleado {
   alquilerConfig?: { activo: boolean } | null;
 }
 interface DeudaAlquiler { id: string; saldo: number; estado: string; }
+/** Forma real de GET /clientes/:id/citas (clientes.service.ts#getCitas) —
+ * distinta de `Cita` de arriba (esa es la de GET /citas). `empleadoId` se
+ * agregó para poder filtrar inquilinos del historial igual que el resto. */
+interface CitaHistorial {
+  id: string; fecha: string; estado: string; total: number;
+  servicios: string[];
+  empleado?: string;
+  empleadoId?: string;
+}
 
 // La rejilla cubre de START_H a END_H (END_H exclusivo, igual que nowTop más
 // abajo): con START_H=8 y END_H=22, la última fila es 21:00-22:00.
@@ -211,12 +220,20 @@ export function AgendaPage() {
 
   const selCita = citasVisibles.find(c => c.id === selId) ?? null;
   const clienteId = selCita?.cliente?.id ?? null;
-  const { data: historial = [] } = useQuery<Cita[]>({
+  const { data: historial = [] } = useQuery<CitaHistorial[]>({
     queryKey: ['cliente-citas', clienteId],
     queryFn: () => api.get(`/clientes/${clienteId}/citas`).then(r => r.data),
     enabled: !!clienteId,
     staleTime: 60_000,
   });
+  // Mismo criterio que citasVisibles: con el ajuste apagado (y para
+  // cualquiera que no sea el propio inquilino), el historial del cliente
+  // tampoco debe mostrar sus citas con un inquilino.
+  const historialVisible = useMemo(() => {
+    if (!ocultarInquilinos) return historial;
+    const idsInquilinos = new Set(empleados.filter(esInquilinoAgenda).map(e => e.id));
+    return historial.filter(h => !h.empleadoId || !idsInquilinos.has(h.empleadoId));
+  }, [historial, empleados, ocultarInquilinos]);
 
   const cambiarEstado = useMutation({
     mutationFn: ({ id, estado }: { id: string; estado: string }) =>
@@ -313,7 +330,7 @@ export function AgendaPage() {
     return m;
   }, [empList, citasVisibles]);
 
-  const histPrev = historial
+  const histPrev = historialVisible
     .filter(c => c.fecha < fecha && !TERMINALES.includes(c.estado))
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .slice(0, 3);
