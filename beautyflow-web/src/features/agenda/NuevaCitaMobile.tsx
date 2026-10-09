@@ -74,6 +74,10 @@ export function NuevaCitaMobile({
   const [paso, setPaso]               = useState(1);
   const [fecha, setFecha]             = useState(fechaInicial);
   const [empleadoId, setEmpleadoId]   = useState<string | null>(empleadoInicial ?? null);
+  // "Yo (dueño)": opción explícita para el OWNER, en vez de que dejar
+  // "Empleado" sin elegir signifique implícitamente "para mí". Mutuamente
+  // excluyente con empleadoId (nunca los dos a la vez).
+  const [eligioYo, setEligioYo]       = useState(false);
   const [serviciosIds, setServiciosIds] = useState<string[]>([]);
   const [horaInicio, setHoraInicio]   = useState<string | null>(horaInicial ?? null);
   const [clienteId, setClienteId]     = useState<string | null>(null);
@@ -84,7 +88,7 @@ export function NuevaCitaMobile({
   const [avisoHora, setAvisoHora]     = useState<string | null>(null);
 
   // ─── Queries (se cachean globalmente) ───
-  const { data: empleados = [] } = useQuery<Empleado[]>({
+  const { data: empleados = [], isLoading: empleadosLoading } = useQuery<Empleado[]>({
     queryKey: ['empleados'],
     queryFn: () => api.get('/empleados').then(r => r.data),
   });
@@ -102,14 +106,38 @@ export function NuevaCitaMobile({
   const esOwner = authUser?.rol === 'OWNER';
   const miEmpleado = empleados.find(e => e.usuario?.id === authUser?.id) ?? null;
 
-  // Dejar "Empleado" sin elegir es válido SOLO para el dueño — significa
-  // "la cita es para mí" (el backend resuelve/crea su Empleado fantasma
-  // igual que hace el POS). `miEmpleado` puede no existir todavía si es su
+  // "Yo (dueño)" elegido explícitamente (ver paso 1) → la cita es para mí
+  // (el backend resuelve/crea el Empleado fantasma igual que hace el POS,
+  // omitiendo empleadoId). `miEmpleado` puede no existir todavía si es su
   // primera cita/venta — en ese caso no hay id que consultar contra
   // disponibilidad.service.ts, así que se asume libre todo el día (no
   // puede haber conflictos: si el Empleado no existe, no tiene citas).
-  const empleadoIdEfectivo = empleadoId ?? (esOwner ? miEmpleado?.id ?? null : null);
-  const duenoSinEmpleadoAun = !empleadoId && esOwner && !miEmpleado;
+  const empleadoIdEfectivo = empleadoId ?? (eligioYo ? miEmpleado?.id ?? null : null);
+  const duenoSinEmpleadoAun = !empleadoId && eligioYo && !miEmpleado;
+
+  // Si el wizard se abrió desde un clic en un hueco de la columna "(dueño)"
+  // de la Agenda de escritorio, empleadoInicial trae el id del Empleado
+  // fantasma — eso nunca debe quedar como una selección de empleado normal,
+  // se traduce a "Yo (dueño)" en cuanto se sabe (espera a que /empleados
+  // termine de cargar para poder mirar esCuentaDueno).
+  useEffect(() => {
+    if (!empleadoInicial || empleadosLoading) return;
+    const emp = empleados.find(e => e.id === empleadoInicial);
+    if (emp?.esCuentaDueno) {
+      setEmpleadoId(null);
+      setEligioYo(true);
+    }
+  }, [empleadoInicial, empleados, empleadosLoading]);
+
+  // Atajo para quien recién empieza sin personal cargado: si la empresa no
+  // tiene ningún empleado real, "Yo (dueño)" queda preseleccionada sola.
+  // Solo corre una vez que /empleados cargó, y solo si nada se eligió ni se
+  // precargó todavía (para no pisar una elección real del usuario).
+  useEffect(() => {
+    if (empleadosLoading || !esOwner || empleadoId || eligioYo) return;
+    const hayEmpleadosReales = empleados.some(e => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
+    if (!hayEmpleadosReales) setEligioYo(true);
+  }, [empleadosLoading, esOwner, empleadoId, eligioYo, empleados]);
 
   const { data: disp, isLoading: dispLoading } = useQuery<Disponibilidad>({
     queryKey: ['disponibilidad', empleadoIdEfectivo, fecha],
@@ -165,8 +193,9 @@ export function NuevaCitaMobile({
   }, [disp, duracionTotal, empleadoIdEfectivo, duenoSinEmpleadoAun]);
 
   const empleadoSel = empleados.find(e => e.id === empleadoId);
-  // Cuando no se eligió a nadie, la cita queda a nombre del dueño.
-  const nombreProfesional = empleadoSel?.nombre ?? (esOwner ? `${authUser?.nombre ?? 'Tú'} (dueño)` : undefined);
+  // "Yo (dueño)" elegido en el paso 1 → este rótulo (el texto "(dueño)" de
+  // los pasos 3 y 4 no cambia).
+  const nombreProfesional = empleadoSel?.nombre ?? (eligioYo ? `${authUser?.nombre ?? 'Tú'} (dueño)` : undefined);
   const clienteSel  = clientes.find(c => c.id === clienteId);
   const fechaObj    = new Date(`${fecha}T00:00:00`);
 
@@ -177,20 +206,24 @@ export function NuevaCitaMobile({
   // (`slots`), así que nunca queda seleccionada una hora que no se vaya a
   // mostrar como tal.
   useEffect(() => {
-    // duracionTotal > 0: sin servicios elegidos todavía (recién abierto
-    // desde un clic en la Agenda) `slots` sale vacío porque no hay nada que
-    // calcular — eso no significa que la hora precargada sea inválida, solo
-    // que aún no se puede validar. Se revisa de verdad recién cuando ya hay
-    // un servicio elegido.
+    // dispLoading: justo después de cambiar empleado/fecha, `disp` todavía
+    // es el de la consulta anterior (o undefined) mientras llega la nueva —
+    // sin esta guarda, un refetch en curso podía leerse como "la hora ya no
+    // cabe" y disparar un aviso falso. duracionTotal > 0: sin servicios
+    // elegidos todavía (recién abierto desde un clic en la Agenda) `slots`
+    // sale vacío porque no hay nada que calcular — eso tampoco significa que
+    // la hora precargada sea inválida, solo que aún no se puede validar.
+    if (dispLoading) return;
     if (horaInicio && duracionTotal > 0 && !slots.includes(horaInicio)) {
       setHoraInicio(null);
       setAvisoHora('La hora ya no está disponible para esta duración. Elige otra.');
     }
-  }, [slots, horaInicio, duracionTotal]);
+  }, [slots, horaInicio, duracionTotal, dispLoading]);
 
   // ─── Handlers ───
   function cambiarFecha(f: string) { setFecha(f); setHoraInicio(null); setAvisoHora(null); }
-  function cambiarEmpleado(id: string) { setEmpleadoId(id); setHoraInicio(null); setAvisoHora(null); }
+  function cambiarEmpleado(id: string) { setEmpleadoId(id); setEligioYo(false); setHoraInicio(null); setAvisoHora(null); }
+  function elegirYoDueno() { setEmpleadoId(null); setEligioYo(true); setHoraInicio(null); setAvisoHora(null); }
   function toggleServicio(id: string) {
     setServiciosIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     setAvisoHora(null);
@@ -231,9 +264,9 @@ export function NuevaCitaMobile({
   });
 
   // ─── Condiciones para avanzar ───
-  // El dueño puede avanzar sin elegir a nadie (la cita queda para él);
-  // cualquier otro rol sí tiene que elegir un profesional.
-  const puedeIr2      = !!empleadoId || esOwner;
+  // Hay que elegir algo siempre: un empleado real, o "Yo (dueño)" si sos el
+  // dueño. Ya no existe el atajo de avanzar sin elegir a nadie.
+  const puedeIr2      = !!empleadoId || eligioYo;
   const puedeIr3      = serviciosIds.length > 0;
   const puedeIr4      = !!horaInicio;
   const puedeConfirmar = !!clienteId && !crearCita.isPending;
@@ -312,28 +345,35 @@ export function NuevaCitaMobile({
                 </div>
               ) : (
                 <div className={styles.empList}>
+                  {esOwner && (
+                    <button
+                      className={`${styles.empItem} ${eligioYo ? styles.empItemSel : ''}`}
+                      onClick={elegirYoDueno}
+                    >
+                      <div className={styles.empAvatar}>{(authUser?.nombre ?? 'Y').charAt(0).toUpperCase()}</div>
+                      <span className={styles.empNom}>Yo (dueño)</span>
+                      {eligioYo && (
+                        <svg className={styles.checkIco} viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/>
+                        </svg>
+                      )}
+                    </button>
+                  )}
                   {empleadosActivos.length === 0 && !esOwner && (
                     <div className={styles.noDisp}>
                       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
                       No hay profesionales disponibles en agenda
                     </div>
                   )}
-                  {esOwner && (
-                    <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 8px' }}>
-                      {empleadosActivos.length === 0
-                        ? 'Todavía no tenés empleados en Agenda — sin elegir a nadie, la cita queda a tu nombre.'
-                        : 'Si no elegís a nadie, la cita queda a tu nombre.'}
-                    </p>
-                  )}
                   {empleadosActivos.map(e => (
                     <button
                       key={e.id}
-                      className={`${styles.empItem} ${empleadoId === e.id ? styles.empItemSel : ''}`}
+                      className={`${styles.empItem} ${!eligioYo && empleadoId === e.id ? styles.empItemSel : ''}`}
                       onClick={() => cambiarEmpleado(e.id)}
                     >
                       <div className={styles.empAvatar}>{e.nombre.charAt(0).toUpperCase()}</div>
                       <span className={styles.empNom}>{e.nombre}</span>
-                      {empleadoId === e.id && (
+                      {!eligioYo && empleadoId === e.id && (
                         <svg className={styles.checkIco} viewBox="0 0 24 24">
                           <circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/>
                         </svg>
