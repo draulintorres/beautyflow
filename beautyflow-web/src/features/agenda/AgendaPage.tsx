@@ -213,7 +213,7 @@ export function AgendaPage() {
     : null;
   const nowLabel = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-  const empList = useMemo(() => {
+  const empList = useMemo<(Empleado & { extraLabel?: string })[]>(() => {
     // esCuentaDueno excluido: no es personal bookable (ver mismo criterio
     // en NuevaCitaMobile.tsx) -- no tiene sentido como columna del calendario.
     let base = empleados.filter(e => e.activo && e.participaAgenda !== false && !e.esCuentaDueno);
@@ -223,14 +223,47 @@ export function AgendaPage() {
     // independiente dentro del salón).
     if (soyInquilino) base = base.filter(e => e.usuario?.id === authUser?.id);
     const fromDB = base.slice(0, 6);
-    if (fromDB.length > 0) return fromDB;
-    const map = new Map<string, Empleado>();
-    for (const c of citas) {
-      if (c.empleado && !map.has(c.empleado.id)) {
-        map.set(c.empleado.id, { id: c.empleado.id, nombre: c.empleado.nombre, activo: true, participaAgenda: true });
+
+    if (fromDB.length === 0) {
+      // Sin ningún empleado real activo: mismo comportamiento de siempre,
+      // arma columnas directo desde las citas del día (puede incluir al
+      // dueño — no hay otra forma de mostrar nada ese día).
+      const map = new Map<string, Empleado>();
+      for (const c of citas) {
+        if (c.empleado && !map.has(c.empleado.id)) {
+          map.set(c.empleado.id, { id: c.empleado.id, nombre: c.empleado.nombre, activo: true, participaAgenda: true });
+        }
       }
+      return Array.from(map.values()).slice(0, 6);
     }
-    return Array.from(map.values()).slice(0, 6);
+
+    // Red de seguridad: ninguna cita del día debe quedar sin columna (dueño,
+    // empleados desactivados, o el 7º empleado en adelante). Columnas extra,
+    // solo para este día, siempre al final. Un inquilino nunca ve columnas
+    // de nadie más — ni siquiera esta red de seguridad se activa para él.
+    const columnas: (Empleado & { extraLabel?: string })[] = [...fromDB];
+    if (!soyInquilino) {
+      const idsConColumna = new Set(columnas.map(e => e.id));
+      const extras = new Map<string, Empleado & { extraLabel?: string }>();
+      for (const c of citas) {
+        if (!c.empleado || idsConColumna.has(c.empleado.id) || extras.has(c.empleado.id)) continue;
+        const real = empleados.find(e => e.id === c.empleado!.id);
+        const extraLabel = real?.esCuentaDueno
+          ? '(dueño)'
+          : real && (!real.activo || real.participaAgenda === false)
+            ? '(inactivo)'
+            : undefined; // 7º empleado real en adelante: sin etiqueta, nombre normal
+        extras.set(c.empleado.id, {
+          id: c.empleado.id,
+          nombre: c.empleado.nombre,
+          activo: true,
+          participaAgenda: true,
+          extraLabel,
+        });
+      }
+      columnas.push(...extras.values());
+    }
+    return columnas;
   }, [empleados, citas, soyInquilino, authUser]);
 
   const citasByEmp = useMemo(() => {
@@ -322,7 +355,7 @@ export function AgendaPage() {
                       </div>
                       <div>
                         <b>{emp.nombre.split(' ')[0]}</b>
-                        <small>Estilista</small>
+                        <small>{emp.extraLabel ?? 'Estilista'}</small>
                       </div>
                     </div>
                   ))}
