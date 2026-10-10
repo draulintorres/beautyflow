@@ -231,9 +231,27 @@ export function NuevaCitaMobile({
     if (dispLoading) return;
     if (horaInicio && duracionTotal > 0 && !slots.includes(horaInicio)) {
       setHoraInicio(null);
-      setAvisoHora('La hora ya no está disponible para esta duración. Elige otra.');
+      // Mismo criterio que DisponibilidadService.motivoNoDisponible() en el
+      // backend: si no cabe por jornada laboral (no trabaja ese día, o el
+      // intervalo se sale de su horaInicio/horaFin) es un aviso distinto al
+      // de un choque con otra cita/bloqueo — ese caso sigue siendo "ya no
+      // disponible" a secas. El bypass del dueño (jornada 00:00–23:59, o sin
+      // Empleado creado aún) nunca entra aquí fuera de horario porque su
+      // jornada cubre el día entero.
+      const iniMin = toMin(horaInicio);
+      const finMin = iniMin + duracionTotal;
+      const jornadaIni = disp?.horaInicio ? toMin(disp.horaInicio) : null;
+      const jornadaFin = disp?.horaFin ? toMin(disp.horaFin) : null;
+      const fueraDeHorario =
+        !disp?.trabaja || jornadaIni === null || jornadaFin === null ||
+        iniMin < jornadaIni || finMin > jornadaFin;
+      setAvisoHora(
+        fueraDeHorario
+          ? 'Esa hora está fuera del horario de trabajo de este empleado. Ajusta su horario en Equipo → Horarios o elige otra hora.'
+          : 'La hora ya no está disponible para esta duración. Elige otra.'
+      );
     }
-  }, [slots, horaInicio, duracionTotal, dispLoading]);
+  }, [slots, horaInicio, duracionTotal, dispLoading, disp]);
 
   // ─── Handlers ───
   function cambiarFecha(f: string) { setFecha(f); setHoraInicio(null); setAvisoHora(null); }
