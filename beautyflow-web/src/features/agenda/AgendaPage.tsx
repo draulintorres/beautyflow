@@ -585,7 +585,7 @@ export function AgendaPage() {
                   {histPrev.map(h => (
                     <div key={h.id} className={styles.hrow}>
                       <span className={styles.hdate}>{labelFechaMini(h.fecha)}</span>
-                      <span className={styles.hserv}>{h.servicios[0]?.nombre ?? 'N/A'}</span>
+                      <span className={styles.hserv}>{h.servicios[0] ?? 'N/A'}</span>
                       <span className={styles.hamt}>RD${formatMoney(h.total)}</span>
                     </div>
                   ))}
