@@ -5,7 +5,16 @@ const prisma = new PrismaClient();
 
 async function main() {
   // ── Super Admin ──────────────────────────────────────────
-  const hash = await bcrypt.hash('SuperPass123', 12);
+  // La clave nunca va en este archivo: se lee de una variable de entorno
+  // para no volver a exponerla en el repo (fue filtrada una vez con un
+  // literal acá y ya está rotada).
+  const superadminPassword = process.env.SUPERADMIN_SEED_PASSWORD;
+  if (!superadminPassword) {
+    throw new Error(
+      'Falta SUPERADMIN_SEED_PASSWORD en el entorno — no se puede sembrar el SuperAdmin sin ella.',
+    );
+  }
+  const hash = await bcrypt.hash(superadminPassword, 12);
   await prisma.superAdmin.upsert({
     where:  { email: 'admin@beautyflow.do' },
     update: {},
@@ -16,7 +25,7 @@ async function main() {
       activo:       true,
     },
   });
-  console.log('✓ SuperAdmin: admin@beautyflow.do / SuperPass123');
+  console.log('✓ SuperAdmin: admin@beautyflow.do (clave tomada de SUPERADMIN_SEED_PASSWORD)');
 
   // ── Planes SaaS ──────────────────────────────────────────
   // Trial y Básico: upsert por nombre (unique)
