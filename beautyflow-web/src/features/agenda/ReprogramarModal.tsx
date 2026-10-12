@@ -4,6 +4,22 @@ import { api } from '../../lib/api';
 import styles from './AgendaPage.module.css';
 
 /**
+ * Roles que pueden completar un cobro (POST /facturas) — lista única
+ * compartida entre escritorio y móvil para decidir si se muestra
+ * "Cobrar"/"Finalizar y cobrar". RECEPCION queda afuera a propósito: puede
+ * mover el estado de una cita (PATCH /citas/:id/estado lo permite), pero el
+ * backend ya rechaza su POST /facturas con 403 — mostrarle el botón solo
+ * para que falle al final sería peor que no mostrarlo.
+ */
+export const ROLES_QUE_PUEDEN_COBRAR = ['OWNER', 'ADMIN', 'MANAGER', 'CASHIER', 'ALQUILER'];
+
+export const MOTIVOS_SIN_COBRO: { value: string; label: string }[] = [
+  { value: 'CORTESIA', label: 'Cortesía' },
+  { value: 'CLIENTE_NO_PAGO', label: 'Cliente no pagó' },
+  { value: 'OTRO', label: 'Otro' },
+];
+
+/**
  * Formas mínimas que necesita este módulo — tanto el detalle de cita de
  * escritorio como el de móvil satisfacen esto de sobra (tipado
  * estructural), sin acoplarse a la interfaz `Cita`/`Empleado` completa de
@@ -131,6 +147,88 @@ export function ReprogramarModal({
             onClick={() => { setErr(''); reprogramar.mutate(); }}
           >
             {reprogramar.isPending ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "Finalizar sin cobrar" — cortesía/servicio gratis/cliente que no pagó.
+ * Solo OWNER/ADMIN (el backend lo exige igual, esto es para no mostrar un
+ * botón que va a fallar). Pide motivo obligatorio + nota opcional en vez de
+ * un confirm() nativo, mismo cascarón de modal que ReprogramarModal arriba
+ * — no se inventa un sistema de modales nuevo.
+ */
+export function FinalizarSinCobroModal({
+  citaId,
+  onClose,
+  onSuccess,
+}: {
+  citaId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [motivo, setMotivo] = useState('');
+  const [nota, setNota] = useState('');
+  const [err, setErr] = useState('');
+
+  const finalizar = useMutation({
+    mutationFn: () => api.patch(`/citas/${citaId}/finalizar-sin-cobro`, {
+      motivo,
+      ...(nota.trim() ? { nota: nota.trim() } : {}),
+    }).then((r) => r.data),
+    onSuccess: () => onSuccess(),
+    onError: (e: any) => {
+      const msg = e?.response?.data?.message;
+      setErr(typeof msg === 'string' ? msg : Array.isArray(msg) ? msg.join(' · ') : 'No se pudo finalizar sin cobro.');
+    },
+  });
+
+  return (
+    <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHead}>
+          <h3>Finalizar sin cobrar</h3>
+          <button type="button" className={styles.modalClose} onClick={onClose}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div className={styles.modalBody}>
+          <p>
+            Se marcará como Finalizada sin generar ninguna venta — úsalo solo para
+            cortesías o servicios gratuitos. Esta acción queda registrada en Auditoría.
+          </p>
+          <label className={styles.modalField}>
+            <span>Motivo</span>
+            <select value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+              <option value="" disabled>Elige un motivo…</option>
+              {MOTIVOS_SIN_COBRO.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </label>
+          <label className={styles.modalField}>
+            <span>Nota (opcional)</span>
+            <textarea
+              value={nota}
+              maxLength={200}
+              rows={2}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Detalle breve, si hace falta…"
+            />
+          </label>
+          {err && <p className={styles.modalErr}>{err}</p>}
+        </div>
+        <div className={styles.modalFoot}>
+          <button type="button" className={styles.modalBtnCancel} onClick={onClose} disabled={finalizar.isPending}>
+            Cancelar
+          </button>
+          <button
+            type="button" className={styles.modalBtnSave}
+            disabled={!motivo || finalizar.isPending}
+            onClick={() => { setErr(''); finalizar.mutate(); }}
+          >
+            {finalizar.isPending ? 'Guardando…' : 'Sí, finalizar sin cobrar'}
           </button>
         </div>
       </div>

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, downloadPdf } from '../../lib/api';
 import { formatMoney } from '../../lib/format';
 import { useAuthStore } from '../../store/auth';
-import { ReprogramarModal, citaToPosState } from './ReprogramarModal';
+import { ReprogramarModal, citaToPosState, FinalizarSinCobroModal, ROLES_QUE_PUEDEN_COBRAR } from './ReprogramarModal';
 import styles from './AgendaMobile.module.css';
 import { NuevaCitaMobile } from './NuevaCitaMobile';
 
@@ -17,6 +17,9 @@ interface Cita {
   // Candado "una venta por cita" (Parte B): solo no-null si hay una venta
   // ACTIVA ligada.
   venta?: { id: string; estado: string } | null;
+  // Cortesía/servicio gratis (OWNER/ADMIN, PATCH .../finalizar-sin-cobro) —
+  // solo puede ser true con estado FINALIZADA y sin venta.
+  finalizadaSinCobro: boolean;
 }
 interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean; esCuentaDueno?: boolean;
@@ -57,11 +60,14 @@ export function AgendaMobile() {
   const [fecha, setFecha] = useState<Date>(() => new Date());
   const [sel, setSel] = useState<Cita | null>(null);
   const [reprog, setReprog] = useState(false);
+  const [finalizandoSinCobro, setFinalizandoSinCobro] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>('TODAS');
   const [nuevaCita, setNuevaCita] = useState(false);
 
   const authUser = useAuthStore(s => s.user);
   const soyInquilino = authUser?.rol === 'ALQUILER';
+  const puedeCobrar = !!authUser && ROLES_QUE_PUEDEN_COBRAR.includes(authUser.rol);
+  const puedeFinalizarSinCobro = authUser?.rol === 'OWNER' || authUser?.rol === 'ADMIN';
 
   const { data: empleados = [] } = useQuery<Empleado[]>({
     queryKey: ['empleados'],
@@ -262,7 +268,7 @@ export function AgendaMobile() {
       </button>
 
       {/* Detalle de cita (bottom sheet) */}
-      {sel && !reprog && (
+      {sel && !reprog && !finalizandoSinCobro && (
         <div className={styles.overlay} onClick={() => setSel(null)}>
           <div className={styles.sheet} onClick={e => e.stopPropagation()}>
             <div className={styles.handle} />
@@ -271,7 +277,7 @@ export function AgendaMobile() {
               <div>
                 <div className={styles.detCliente}>{sel.cliente?.nombre}</div>
                 <span className={`${styles.badge} ${styles[ESTADO_CLS[sel.estado] ?? 'pend']}`}>
-                  {lbl(sel.estado)}
+                  {sel.estado === 'FINALIZADA' && sel.finalizadaSinCobro ? 'Finalizada · sin cobro' : lbl(sel.estado)}
                 </span>
               </div>
             </div>
@@ -311,21 +317,29 @@ export function AgendaMobile() {
                   Marcar en proceso
                 </button>
               )}
-              {sel.estado === 'EN_PROCESO' && (
-                <button
-                  className={styles.actOk}
-                  disabled={cambiarEstado.isPending}
-                  onClick={() => cambiarEstado.mutate({ id: sel.id, estado: 'FINALIZADA' })}
-                >
-                  Finalizar
-                </button>
-              )}
-              {!sel.venta && (sel.estado === 'CONFIRMADA' || sel.estado === 'PENDIENTE') && (
+              {/* "Finalizar" ya no mueve el estado directo — Finalizar ahora
+                  significa cobrar (ver backend: FINALIZADA solo se alcanza
+                  via venta o "finalizar sin cobro"). */}
+              {!sel.venta && puedeCobrar && (
+                ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(sel.estado)
+                || (sel.estado === 'FINALIZADA' && !sel.finalizadaSinCobro)
+              ) && (
                 <button
                   className={styles.actOk}
                   onClick={() => navigate('/pos', { state: citaToPosState(sel) })}
                 >
-                  Cobrar
+                  {sel.estado === 'EN_PROCESO' ? 'Finalizar y cobrar' : 'Cobrar'}
+                </button>
+              )}
+              {!sel.venta && puedeFinalizarSinCobro && (
+                ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(sel.estado)
+                || (sel.estado === 'FINALIZADA' && !sel.finalizadaSinCobro)
+              ) && (
+                <button
+                  className={styles.actCancel}
+                  onClick={() => setFinalizandoSinCobro(true)}
+                >
+                  Finalizar sin cobrar
                 </button>
               )}
               {(sel.cliente?.whatsapp || sel.cliente?.telefono) && (
@@ -366,6 +380,19 @@ export function AgendaMobile() {
           onClose={() => setReprog(false)}
           onSuccess={() => {
             setReprog(false);
+            setSel(null);
+            qc.invalidateQueries({ queryKey: ['agenda-mobile'] });
+          }}
+        />
+      )}
+
+      {/* Finalizar sin cobrar — mismo modal compartido con escritorio */}
+      {sel && finalizandoSinCobro && (
+        <FinalizarSinCobroModal
+          citaId={sel.id}
+          onClose={() => setFinalizandoSinCobro(false)}
+          onSuccess={() => {
+            setFinalizandoSinCobro(false);
             setSel(null);
             qc.invalidateQueries({ queryKey: ['agenda-mobile'] });
           }}
