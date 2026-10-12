@@ -52,7 +52,11 @@ const TRANSICIONES: Record<CitaStatus, CitaStatus[]> = {
     CitaStatus.CANCELED,
     CitaStatus.NO_SHOW,
   ],
-  [CitaStatus.IN_PROGRESS]: [CitaStatus.COMPLETED, CitaStatus.CANCELED],
+  // COMPLETED ya no es alcanzable desde acá (ver changeEstado): finalizar
+  // ahora exige uno de los dos caminos intencionales — cobrar (ventas.service.ts
+  // marca COMPLETED al ligar la venta) o "finalizar sin cobro" (OWNER/ADMIN,
+  // ver finalizarSinCobro más abajo).
+  [CitaStatus.IN_PROGRESS]: [CitaStatus.CANCELED],
   [CitaStatus.COMPLETED]: [], // terminal
   [CitaStatus.CANCELED]: [], // terminal
   [CitaStatus.NO_SHOW]: [], // terminal
@@ -379,6 +383,15 @@ export class AgendaService {
 
     if (cita.estado === nuevoEstado) {
       return this.findOne(id);
+    }
+    // FINALIZADA ya no se alcanza con un PATCH suelto, para NINGÚN rol —
+    // mensaje específico en vez del genérico de abajo, para que quede claro
+    // que hay un camino intencional a seguir (cobrar o finalizar sin cobro)
+    // y no es simplemente una transición inválida más.
+    if (nuevoEstado === CitaStatus.COMPLETED) {
+      throw new BadRequestException(
+        'No se puede finalizar una cita directamente — cóbrala desde Agenda o, si es cortesía, usa "Finalizar sin cobrar" (solo OWNER/ADMIN).',
+      );
     }
     if (!permitidas.includes(nuevoEstado)) {
       throw new BadRequestException(
