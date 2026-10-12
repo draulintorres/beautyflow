@@ -308,18 +308,13 @@ export function AgendaMobile() {
                   Confirmar
                 </button>
               )}
-              {(sel.estado === 'CONFIRMADA' || sel.estado === 'PENDIENTE') && (
-                <button
-                  className={styles.actInfo}
-                  disabled={cambiarEstado.isPending}
-                  onClick={() => cambiarEstado.mutate({ id: sel.id, estado: 'EN_PROCESO' })}
-                >
-                  Marcar en proceso
-                </button>
-              )}
-              {/* "Finalizar" ya no mueve el estado directo — Finalizar ahora
-                  significa cobrar (ver backend: FINALIZADA solo se alcanza
-                  via venta o "finalizar sin cobro"). */}
+              {/* "Marcar en proceso" se quitó de la app móvil (decisión de
+                  Draulin) -- el backend sigue aceptando PATCH .../estado
+                  hacia EN_PROCESO sin cambios (citas EN_PROCESO ya
+                  existentes, o un cliente viejo en caché, siguen
+                  funcionando). "Finalizar" tampoco mueve el estado directo
+                  — Finalizar ahora significa cobrar (ver backend: FINALIZADA
+                  solo se alcanza via venta o "finalizar sin cobro"). */}
               {!sel.venta && puedeCobrar && (
                 ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(sel.estado)
                 || (sel.estado === 'FINALIZADA' && !sel.finalizadaSinCobro)
