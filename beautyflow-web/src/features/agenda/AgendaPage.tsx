@@ -6,7 +6,7 @@ import { formatMoney, initiales } from '../../lib/format';
 import { useAuthStore } from '../../store/auth';
 import { AgendaMobile } from './AgendaMobile';
 import { NuevaCitaMobile } from './NuevaCitaMobile';
-import { ReprogramarModal, citaToPosState } from './ReprogramarModal';
+import { ReprogramarModal, citaToPosState, FinalizarSinCobroModal, ROLES_QUE_PUEDEN_COBRAR } from './ReprogramarModal';
 import styles from './AgendaPage.module.css';
 
 interface Cita {
@@ -20,6 +20,9 @@ interface Cita {
   // Candado "una venta por cita" (Parte B): solo no-null si hay una venta
   // ACTIVA ligada (anular() limpia esto, ver ReprogramarModal.tsx).
   venta: { id: string; estado: string } | null;
+  // Cortesía/servicio gratis (OWNER/ADMIN, PATCH .../finalizar-sin-cobro) —
+  // solo puede ser true con estado FINALIZADA y sin venta.
+  finalizadaSinCobro: boolean;
 }
 interface Empleado {
   id: string; nombre: string; activo: boolean; participaAgenda: boolean;
@@ -161,6 +164,7 @@ export function AgendaPage() {
   const [now, setNow] = useState(() => new Date());
   const [nuevaCita, setNuevaCita] = useState<null | { empleadoId?: string; hora?: string }>(null);
   const [reprogramando, setReprogramando] = useState(false);
+  const [finalizandoSinCobro, setFinalizandoSinCobro] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -169,6 +173,8 @@ export function AgendaPage() {
 
   const authUser = useAuthStore(s => s.user);
   const soyInquilino = authUser?.rol === 'ALQUILER';
+  const puedeCobrar = !!authUser && ROLES_QUE_PUEDEN_COBRAR.includes(authUser.rol);
+  const puedeFinalizarSinCobro = authUser?.rol === 'OWNER' || authUser?.rol === 'ADMIN';
 
   const { data: empleados = [] } = useQuery<Empleado[]>({
     queryKey: ['empleados'],
@@ -484,7 +490,7 @@ export function AgendaPage() {
                 <span className={styles.citaId}>Cita #{selCita.id.slice(-6).toUpperCase()}</span>
                 <div className={styles.dhRight}>
                   <span className={`${styles.stBadge} ${styles[`badge${ESTADO_CLS[selCita.estado]}`] ?? ''}`}>
-                    {ESTADO_LABEL[selCita.estado]}
+                    {selCita.estado === 'FINALIZADA' && selCita.finalizadaSinCobro ? 'Finalizada · sin cobro' : ESTADO_LABEL[selCita.estado]}
                   </span>
                   <button className={styles.closeBtn} onClick={() => setSelId(null)}>x</button>
                 </div>
@@ -548,15 +554,6 @@ export function AgendaPage() {
                       Confirmar
                     </button>
                   )}
-                  {!selCita.venta && (selCita.estado === 'CONFIRMADA' || selCita.estado === 'PENDIENTE') && (
-                    <button
-                      className={`${styles.dbtn} ${styles.dCobrar}`}
-                      onClick={() => navigate('/pos', { state: citaToPosState(selCita) })}
-                    >
-                      <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
-                      Cobrar
-                    </button>
-                  )}
                   {(selCita.cliente?.whatsapp || selCita.cliente?.telefono) && (
                     <a href={`https://wa.me/1${(selCita.cliente.whatsapp || selCita.cliente.telefono).replace(/\D/g,'')}`}
                       target="_blank" rel="noopener noreferrer"
@@ -573,6 +570,34 @@ export function AgendaPage() {
                     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
                     Cancelar cita
                   </button>
+                </div>
+              )}
+
+              {/* Cobrar / Finalizar sin cobrar: NO van dentro de !isTerminal —
+                  una FINALIZADA heredada (sin venta, sin marca de cortesía)
+                  sigue siendo cobrable o regularizable como cortesía. */}
+              {!selCita.venta && (
+                ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(selCita.estado)
+                || (selCita.estado === 'FINALIZADA' && !selCita.finalizadaSinCobro)
+              ) && (puedeCobrar || puedeFinalizarSinCobro) && (
+                <div className={styles.acts}>
+                  {puedeCobrar && (
+                    <button
+                      className={`${styles.dbtn} ${styles.dCobrar}`}
+                      onClick={() => navigate('/pos', { state: citaToPosState(selCita) })}
+                    >
+                      <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                      {selCita.estado === 'EN_PROCESO' ? 'Finalizar y cobrar' : 'Cobrar'}
+                    </button>
+                  )}
+                  {puedeFinalizarSinCobro && (
+                    <button
+                      className={`${styles.dbtn} ${styles.dCancel}`}
+                      onClick={() => setFinalizandoSinCobro(true)}
+                    >
+                      Finalizar sin cobrar
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -618,6 +643,18 @@ export function AgendaPage() {
           onClose={() => setReprogramando(false)}
           onSuccess={() => {
             setReprogramando(false);
+            qc.invalidateQueries({ queryKey: ['citas', fecha] });
+          }}
+        />
+      )}
+
+      {finalizandoSinCobro && selCita && (
+        <FinalizarSinCobroModal
+          citaId={selCita.id}
+          onClose={() => setFinalizandoSinCobro(false)}
+          onSuccess={() => {
+            setFinalizandoSinCobro(false);
+            setSelId(null);
             qc.invalidateQueries({ queryKey: ['citas', fecha] });
           }}
         />
