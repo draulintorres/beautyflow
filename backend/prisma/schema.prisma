@@ -1125,6 +1125,15 @@ model Cita {
   // barrido o si la ventana se solapa por un reinicio/retraso del cron.
   avisoPrevioEnviadoAt DateTime? @map("aviso_previo_enviado_at")
 
+  // "Finalizar sin cobrar" (cortesía/servicio gratis): true solo cuando la
+  // cita llegó a COMPLETED por esa vía, nunca por una venta PAGADA. Se
+  // limpia a false en la misma transacción si luego se cobra (ver
+  // ventas.service.ts#create) — no es un callejón sin salida, OWNER/ADMIN
+  // pueden cobrarla después. Fuente de verdad para la UI (evita cruzar
+  // contra AuditLog, que sí guarda el motivo/quién/cuándo pero no está
+  // pensado para lecturas de listado).
+  finalizadaSinCobro Boolean @default(false) @map("finalizada_sin_cobro")
+
   empresa   Empresa        @relation(fields: [empresaId], references: [id])
   sucursal  Sucursal?      @relation(fields: [sucursalId], references: [id])
   cliente   Cliente        @relation(fields: [clienteId], references: [id])
