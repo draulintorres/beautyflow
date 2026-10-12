@@ -312,10 +312,13 @@ export class VentasService {
       // cita pasa a COMPLETED — así "Cobrar" deja de mostrarse y la agenda
       // refleja que ya se atendió y cobró. Si esta venta se anula después,
       // anular() revierte la cita a CONFIRMED (ver ahí).
+      // finalizadaSinCobro: false en la misma transacción — una cortesía
+      // marcada antes (o una heredada regularizada) no es un callejón sin
+      // salida, cobrarla de verdad ahora le quita esa marca.
       if (dto.citaId) {
         await tx.cita.update({
           where: { id: dto.citaId },
-          data: { estado: CitaStatus.COMPLETED },
+          data: { estado: CitaStatus.COMPLETED, finalizadaSinCobro: false },
         });
       }
 

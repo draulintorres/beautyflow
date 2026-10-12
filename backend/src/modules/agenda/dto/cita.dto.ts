@@ -101,3 +101,18 @@ export class ChangeEstadoDto {
   })
   estado: keyof typeof ESTADO_ES_TO_ENUM;
 }
+
+export const MOTIVOS_SIN_COBRO = ['CORTESIA', 'CLIENTE_NO_PAGO', 'OTRO'] as const;
+
+export class FinalizarSinCobroDto {
+  @IsString()
+  @IsIn(MOTIVOS_SIN_COBRO, {
+    message: 'motivo debe ser: CORTESIA, CLIENTE_NO_PAGO u OTRO',
+  })
+  motivo: (typeof MOTIVOS_SIN_COBRO)[number];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: 'nota no puede superar 200 caracteres' })
+  nota?: string;
+}

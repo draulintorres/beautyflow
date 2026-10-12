@@ -16,6 +16,7 @@ import {
   CreateCitaDto,
   RescheduleCitaDto,
   ChangeEstadoDto,
+  FinalizarSinCobroDto,
 } from './dto/cita.dto';
 import { Roles, Modulos } from '../../core/auth/decorators/auth.decorators';
 
@@ -70,6 +71,18 @@ export class AgendaController {
     @Body() dto: ChangeEstadoDto,
   ) {
     return this.agenda.changeEstado(id, dto.estado);
+  }
+
+  /** Cortesía / servicio gratis — solo OWNER/ADMIN. Deja registro en
+   *  Auditoría (ver AgendaService#finalizarSinCobro). */
+  @Patch(':id/finalizar-sin-cobro')
+  @Roles('OWNER', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
+  finalizarSinCobro(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: FinalizarSinCobroDto,
+  ) {
+    return this.agenda.finalizarSinCobro(id, dto.motivo, dto.nota);
   }
 
   @Patch(':id/cancelar')

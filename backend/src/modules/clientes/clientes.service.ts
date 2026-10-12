@@ -188,6 +188,7 @@ export class ClientesService {
       empleado: c.empleado?.nombre,
       empleadoId: c.empleado?.id,
       estado: ENUM_TO_ESTADO_ES[c.estado as CitaStatus],
+      finalizadaSinCobro: c.finalizadaSinCobro ?? false,
       total: Number(c.total),
     }));
   }

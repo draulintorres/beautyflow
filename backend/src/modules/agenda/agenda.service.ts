@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { DisponibilidadService } from '../empleados/disponibilidad.service';
@@ -12,6 +13,7 @@ import {
   RescheduleCitaDto,
   ESTADO_ES_TO_ENUM,
   ENUM_TO_ESTADO_ES,
+  MOTIVOS_SIN_COBRO,
 } from './dto/cita.dto';
 import { getEmpresaId, getCurrentUser } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
@@ -406,6 +408,92 @@ export class AgendaService {
     return this.findOne(id);
   }
 
+  // ---------- FINALIZAR SIN COBRO ----------
+  /**
+   * Cortesía / servicio gratis / cliente que no pagó — OWNER/ADMIN marcan la
+   * cita como Finalizada sin que exista ninguna venta. No es un callejón sin
+   * salida: si después se cobra (ventas.service.ts#create liga la venta a la
+   * cita), la marca se limpia sola en la misma transacción de esa venta.
+   *
+   * Atomicidad (evita que un cobro simultáneo deje venta + marca de cortesía
+   * a la vez): el UPDATE real es un `updateMany` condicionado a que la cita
+   * siga sin venta activa (y sin cancelar/no-asistida) en ese mismo momento
+   * — si un cobro en paralelo ya la ligó a una venta entre el findFirst de
+   * arriba y este punto, `result.count` sale en 0 y se rechaza con 409,
+   * igual que si lo hubiéramos visto desde el principio. Todo corre dentro
+   * de `$transaction` para que el update y el registro de auditoría no
+   * puedan quedar desincronizados.
+   */
+  async finalizarSinCobro(id: string, motivo: (typeof MOTIVOS_SIN_COBRO)[number], nota?: string) {
+    const user = getCurrentUser();
+    // El guard del controller (@Roles('OWNER','ADMIN')) ya lo exige; este es
+    // el mismo doble seguro a nivel de servicio que ya usa empresa.service.ts
+    // para pinAnulacionActivo/itbisPct/verAgendaInquilinos.
+    if (user.rol !== RoleKey.OWNER && user.rol !== RoleKey.ADMIN) {
+      throw new ForbiddenException(
+        'Solo el propietario o un administrador puede finalizar una cita sin cobro.',
+      );
+    }
+
+    await this.prisma.db.$transaction(async (tx) => {
+      const cita = await tx.cita.findFirst({
+        where: { id },
+        select: {
+          id: true,
+          estado: true,
+          finalizadaSinCobro: true,
+          venta: { select: { id: true } },
+        },
+      });
+      if (!cita) throw new NotFoundException('Cita no encontrada');
+      if (cita.venta) {
+        throw new ConflictException(
+          'Esta cita ya fue cobrada — no se puede marcar como cortesía.',
+        );
+      }
+      if (cita.estado === CitaStatus.CANCELED || cita.estado === CitaStatus.NO_SHOW) {
+        throw new BadRequestException(
+          'No se puede finalizar sin cobro una cita cancelada o no asistida.',
+        );
+      }
+      // Idempotente de verdad SOLO si ya es cortesía — una heredada
+      // (COMPLETED, sin venta, sin marca) debe regularizarse, no salir
+      // "sin cambios" en silencio.
+      if (cita.estado === CitaStatus.COMPLETED && cita.finalizadaSinCobro) {
+        return; // idempotente de verdad: nada que hacer ni auditar
+      }
+
+      const result = await tx.cita.updateMany({
+        where: {
+          id,
+          venta: { is: null },
+          estado: { notIn: [CitaStatus.CANCELED, CitaStatus.NO_SHOW] },
+        },
+        data: { estado: CitaStatus.COMPLETED, finalizadaSinCobro: true },
+      });
+      if (result.count === 0) {
+        // Alguien la cobró (o canceló) entre el findFirst y este punto.
+        throw new ConflictException(
+          'Esta cita ya fue cobrada — no se puede marcar como cortesía.',
+        );
+      }
+
+      await this.audit.log({
+        modulo: 'AGENDA',
+        entidad: 'Cita',
+        entidadId: id,
+        accion: 'FINALIZAR_SIN_COBRO',
+        datosAntes: {
+          estado: ENUM_TO_ESTADO_ES[cita.estado],
+          finalizadaSinCobro: cita.finalizadaSinCobro,
+        },
+        datosDespues: { estado: 'FINALIZADA', finalizadaSinCobro: true, motivo, nota: nota ?? null },
+      });
+    });
+
+    return this.findOne(id);
+  }
+
   // ---------- CANCELAR ----------
   async cancelar(id: string) {
     const cita = await this.prisma.db.cita.findFirst({
@@ -659,6 +747,7 @@ export class AgendaService {
       horaInicio: this.hhmm(c.inicio),
       horaFin: this.hhmm(c.fin),
       estado: ENUM_TO_ESTADO_ES[c.estado as CitaStatus],
+      finalizadaSinCobro: c.finalizadaSinCobro ?? false,
       cliente: c.cliente
         ? { id: c.cliente.id, nombre: c.cliente.nombre, telefono: c.cliente.telefono }
         : null,
