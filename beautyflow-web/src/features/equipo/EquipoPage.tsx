@@ -88,7 +88,13 @@ function avatarBg(nombre: string): string {
 
 const errMsg = (e: unknown) => {
   const msg = (e as any)?.response?.data?.message;
-  return msg ? (Array.isArray(msg) ? msg.join(' · ') : String(msg)) : 'Error inesperado.';
+  if (msg) return Array.isArray(msg) ? msg.join(' · ') : String(msg);
+  // Validaciones hechas en el propio navegador (throw new Error(...) antes
+  // de llamar a la API, ej. horarios/comisión/alquiler más abajo en este
+  // archivo) no tienen `.response` — sin este fallback su mensaje real se
+  // perdía y siempre se mostraba "Error inesperado.", sin pista de qué pasó.
+  const local = (e as any)?.message;
+  return typeof local === 'string' && local ? local : 'Error inesperado.';
 };
 
 function useToast() {
