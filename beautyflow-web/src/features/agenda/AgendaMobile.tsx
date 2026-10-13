@@ -298,6 +298,21 @@ export function AgendaMobile() {
               </div>
             )}
 
+            {/* citaCobrable: pendiente/confirmada/en proceso, sin venta.
+                citaHeredada: FINALIZADA sin venta y sin marca de cortesía.
+                citaCortesia: FINALIZADA sin venta, marcada "sin cobro" --
+                tampoco es un callejón sin salida: OWNER/ADMIN (los mismos
+                que pudieron marcarla) pueden cobrarla después, aunque el
+                resto de roles que sí cobran (MANAGER/CASHIER/ALQUILER) no
+                vean ese botón ahí -- es una decisión de cortesía, no un
+                cobro cualquiera. */}
+            {(() => {
+              const citaCobrable = !sel.venta && ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(sel.estado);
+              const citaHeredada = !sel.venta && sel.estado === 'FINALIZADA' && !sel.finalizadaSinCobro;
+              const citaCortesia = !sel.venta && sel.estado === 'FINALIZADA' && sel.finalizadaSinCobro;
+              const verCobrar = (puedeCobrar && (citaCobrable || citaHeredada)) || (puedeFinalizarSinCobro && citaCortesia);
+              const verFinalizarSinCobro = puedeFinalizarSinCobro && (citaCobrable || citaHeredada);
+              return (
             <div className={styles.detActions}>
               {sel.estado === 'PENDIENTE' && (
                 <button
@@ -315,10 +330,7 @@ export function AgendaMobile() {
                   funcionando). "Finalizar" tampoco mueve el estado directo
                   — Finalizar ahora significa cobrar (ver backend: FINALIZADA
                   solo se alcanza via venta o "finalizar sin cobro"). */}
-              {!sel.venta && puedeCobrar && (
-                ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(sel.estado)
-                || (sel.estado === 'FINALIZADA' && !sel.finalizadaSinCobro)
-              ) && (
+              {verCobrar && (
                 <button
                   className={styles.actOk}
                   onClick={() => navigate('/pos', { state: citaToPosState(sel) })}
@@ -326,10 +338,7 @@ export function AgendaMobile() {
                   {sel.estado === 'EN_PROCESO' ? 'Finalizar y cobrar' : 'Cobrar'}
                 </button>
               )}
-              {!sel.venta && puedeFinalizarSinCobro && (
-                ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(sel.estado)
-                || (sel.estado === 'FINALIZADA' && !sel.finalizadaSinCobro)
-              ) && (
+              {verFinalizarSinCobro && (
                 <button
                   className={styles.actCancel}
                   onClick={() => setFinalizandoSinCobro(true)}
@@ -362,6 +371,8 @@ export function AgendaMobile() {
                 </button>
               )}
             </div>
+              );
+            })()}
           </div>
         </div>
       )}

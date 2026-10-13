@@ -225,6 +225,16 @@ export function AgendaPage() {
   );
 
   const selCita = citasVisibles.find(c => c.id === selId) ?? null;
+  // citaCobrable: pendiente/confirmada/en proceso, sin venta.
+  // citaHeredada: FINALIZADA sin venta y sin marca de cortesía.
+  // citaCortesia: FINALIZADA sin venta, marcada "sin cobro" -- tampoco es un
+  // callejón sin salida: OWNER/ADMIN (los mismos que pudieron marcarla)
+  // pueden cobrarla después, aunque el resto de roles que sí cobran
+  // (MANAGER/CASHIER/ALQUILER) no vean ese botón ahí -- es una decisión de
+  // cortesía, no un cobro cualquiera.
+  const citaCobrable = !!selCita && !selCita.venta && ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(selCita.estado);
+  const citaHeredada = !!selCita && !selCita.venta && selCita.estado === 'FINALIZADA' && !selCita.finalizadaSinCobro;
+  const citaCortesia = !!selCita && !selCita.venta && selCita.estado === 'FINALIZADA' && selCita.finalizadaSinCobro;
   const clienteId = selCita?.cliente?.id ?? null;
   const { data: historial = [] } = useQuery<CitaHistorial[]>({
     queryKey: ['cliente-citas', clienteId],
@@ -574,32 +584,34 @@ export function AgendaPage() {
               )}
 
               {/* Cobrar / Finalizar sin cobrar: NO van dentro de !isTerminal —
-                  una FINALIZADA heredada (sin venta, sin marca de cortesía)
-                  sigue siendo cobrable o regularizable como cortesía. */}
-              {!selCita.venta && (
-                ['PENDIENTE', 'CONFIRMADA', 'EN_PROCESO'].includes(selCita.estado)
-                || (selCita.estado === 'FINALIZADA' && !selCita.finalizadaSinCobro)
-              ) && (puedeCobrar || puedeFinalizarSinCobro) && (
-                <div className={styles.acts}>
-                  {puedeCobrar && (
-                    <button
-                      className={`${styles.dbtn} ${styles.dCobrar}`}
-                      onClick={() => navigate('/pos', { state: citaToPosState(selCita) })}
-                    >
-                      <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
-                      {selCita.estado === 'EN_PROCESO' ? 'Finalizar y cobrar' : 'Cobrar'}
-                    </button>
-                  )}
-                  {puedeFinalizarSinCobro && (
-                    <button
-                      className={`${styles.dbtn} ${styles.dCancel}`}
-                      onClick={() => setFinalizandoSinCobro(true)}
-                    >
-                      Finalizar sin cobrar
-                    </button>
-                  )}
-                </div>
-              )}
+                  una FINALIZADA heredada o de cortesía (sin venta) sigue
+                  siendo cobrable. */}
+              {(() => {
+                const verCobrar = (puedeCobrar && (citaCobrable || citaHeredada)) || (puedeFinalizarSinCobro && citaCortesia);
+                const verFinalizarSinCobro = puedeFinalizarSinCobro && (citaCobrable || citaHeredada);
+                if (!verCobrar && !verFinalizarSinCobro) return null;
+                return (
+                  <div className={styles.acts}>
+                    {verCobrar && (
+                      <button
+                        className={`${styles.dbtn} ${styles.dCobrar}`}
+                        onClick={() => navigate('/pos', { state: citaToPosState(selCita) })}
+                      >
+                        <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                        {selCita.estado === 'EN_PROCESO' ? 'Finalizar y cobrar' : 'Cobrar'}
+                      </button>
+                    )}
+                    {verFinalizarSinCobro && (
+                      <button
+                        className={`${styles.dbtn} ${styles.dCancel}`}
+                        onClick={() => setFinalizandoSinCobro(true)}
+                      >
+                        Finalizar sin cobrar
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
 
               {histPrev.length > 0 && (
                 <div className={styles.history}>
