@@ -20,6 +20,7 @@ import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { InquilinoService } from '../../core/auth/inquilino.service';
 import { NotificationService } from '../notificaciones/notification.service';
+import { VentasService } from '../pos/ventas.service';
 import {
   CitaStatus,
   CitaOrigen,
@@ -73,6 +74,7 @@ export class AgendaService {
     private readonly notif: NotificationService,
     private readonly inquilinoSvc: InquilinoService,
     private readonly sucursalScope: SucursalScopeService,
+    private readonly ventas: VentasService,
   ) {}
 
   // ---------- CREAR ----------
@@ -442,7 +444,21 @@ export class AgendaService {
           id: true,
           estado: true,
           finalizadaSinCobro: true,
+          clienteId: true,
+          empleadoId: true,
+          sucursalId: true,
+          subtotal: true,
+          descuento: true,
+          itbis: true,
+          total: true,
           venta: { select: { id: true } },
+          empleado: {
+            select: {
+              modeloPago: true,
+              alquilerConfig: { select: { activo: true } },
+            },
+          },
+          servicios: { select: { servicioId: true, precio: true } },
         },
       });
       if (!cita) throw new NotFoundException('Cita no encontrada');
@@ -456,6 +472,67 @@ export class AgendaService {
           'No se puede finalizar sin cobro una cita cancelada o no asistida.',
         );
       }
+
+      // ---- "Cliente no pagó": crea una Venta PENDIENTE (deuda real) ----
+      if (motivo === 'CLIENTE_NO_PAGO') {
+        // Inquilino: este camino queda bloqueado. Su cobro pendiente se
+        // registra desde su propio POS con fiao normal (sí exige
+        // permiteFiao) — no desde este atajo de OWNER/ADMIN que
+        // deliberadamente no respeta esas reglas (ver Fase 1/2 de esta
+        // misma feature).
+        const esInquilino =
+          cita.empleado?.modeloPago === ModeloPago.ALQUILER &&
+          cita.empleado?.alquilerConfig?.activo === true;
+        if (esInquilino) {
+          throw new BadRequestException(
+            'Esta cita es de un colaborador por alquiler — no se puede usar "Cliente no pagó" aquí. Usa Cortesía u Otro, o cobra con fiao desde el POS del propio colaborador.',
+          );
+        }
+
+        const resultado = await this.ventas.crearPendientePorCitaSinCobro(
+          tx,
+          {
+            id: cita.id,
+            clienteId: cita.clienteId,
+            empleadoId: cita.empleadoId,
+            sucursalId: cita.sucursalId,
+            subtotal: Number(cita.subtotal),
+            descuento: Number(cita.descuento),
+            itbis: Number(cita.itbis),
+            total: Number(cita.total),
+            servicios: cita.servicios.map((s) => ({
+              servicioId: s.servicioId,
+              precio: Number(s.precio),
+            })),
+          },
+          user.usuarioId,
+        );
+
+        await this.audit.log({
+          modulo: 'AGENDA',
+          entidad: 'Cita',
+          entidadId: id,
+          accion: 'FINALIZAR_SIN_COBRO',
+          datosAntes: {
+            estado: ENUM_TO_ESTADO_ES[cita.estado],
+            finalizadaSinCobro: cita.finalizadaSinCobro,
+          },
+          datosDespues: {
+            estado: 'FINALIZADA',
+            finalizadaSinCobro: false,
+            motivo,
+            nota: nota ?? null,
+            ventaId: resultado.ventaId,
+            ventaNumero: resultado.numero,
+            omitioPermiteFiao: resultado.omitioPermiteFiao,
+            omitioLimiteCredito: resultado.omitioLimiteCredito,
+            montoExcedido: resultado.montoExcedido,
+          },
+        });
+        return;
+      }
+
+      // ---- CORTESIA / OTRO: igual que antes ----
       // Idempotente de verdad SOLO si ya es cortesía — una heredada
       // (COMPLETED, sin venta, sin marca) debe regularizarse, no salir
       // "sin cambios" en silencio.
@@ -734,9 +811,10 @@ export class AgendaService {
       // Candado "una venta por cita" (Parte B): solo existe (no-null) si
       // hay una venta ACTIVA ligada — anular() limpia venta.citaId, así
       // que una venta anulada no aparece aquí y la cita vuelve a ser
-      // cobrable. El frontend usa esto para mostrar "Ya cobrada" + recibo
-      // en vez de "Cobrar".
-      venta: { select: { id: true, estado: true } },
+      // cobrable. El frontend usa `estado` para distinguir "Ya cobrada"
+      // (PAGADA) de "Pendiente de cobro" (PENDIENTE/ABONO_PARCIAL, nacida
+      // de "Cliente no pagó") — por eso también viaja `saldo`.
+      venta: { select: { id: true, estado: true, saldo: true } },
     };
   }
 
@@ -755,7 +833,7 @@ export class AgendaService {
         ? { id: c.empleado.id, nombre: c.empleado.nombre }
         : null,
       cabina: c.cabina ? { id: c.cabina.id, nombre: c.cabina.nombre } : null,
-      venta: c.venta ? { id: c.venta.id, estado: c.venta.estado } : null,
+      venta: c.venta ? { id: c.venta.id, estado: c.venta.estado, saldo: Number(c.venta.saldo) } : null,
       servicios:
         c.servicios?.map((s: any) => ({
           servicioId: s.servicioId,

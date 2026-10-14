@@ -349,6 +349,173 @@ export class VentasService {
     return this.findOne(venta.id);
   }
 
+  // ============ "CLIENTE NO PAGÓ" (Finalizar sin cobrar desde Agenda) ============
+  /**
+   * Crea una Venta PENDIENTE a partir de las líneas de la cita, ligada a
+   * ella — la deuda del cliente entra a Cuentas por Cobrar como cualquier
+   * fiao. A propósito NO llama a validarFiao(): esto no es un cliente
+   * eligiendo crédito en el POS, es OWNER/ADMIN registrando una deuda que
+   * ya pasó, así que no exige `permiteFiao` ni respeta `limiteCredito` —
+   * solo los chequea para avisar (al caller, para la auditoría) si se
+   * hubieran violado.
+   *
+   * Se llama desde DENTRO de la transacción que abre AgendaService — por
+   * eso recibe `tx` y nunca abre la suya (evita transacciones anidadas).
+   * El candado real contra doble-envío es el índice único de
+   * Venta.citaId: si dos llamadas concurrentes llegan aquí casi a la vez,
+   * la segunda revienta por constraint (P2002) al crear la venta y su
+   * transacción entera se revierte — ni la venta ni el cambio de la cita
+   * quedan a medias.
+   *
+   * Totales/sucursal: se copian tal cual de la cita (misma fórmula de
+   * ITBIS que usa agenda.service.ts al crearla), no se recalculan — así
+   * coinciden por construcción. Comisión por línea: mismo calcComision()
+   * que cualquier venta normal, nada especial para este camino.
+   */
+  async crearPendientePorCitaSinCobro(
+    tx: TxClient,
+    cita: {
+      id: string;
+      clienteId: string;
+      empleadoId: string;
+      sucursalId: string | null;
+      subtotal: number;
+      descuento: number;
+      itbis: number;
+      total: number;
+      servicios: { servicioId: string; precio: number }[];
+    },
+    usuarioRegistraId: string,
+  ): Promise<{
+    ventaId: string;
+    numero: number;
+    omitioPermiteFiao: boolean;
+    omitioLimiteCredito: boolean;
+    montoExcedido: number;
+  }> {
+    const empresaId = getEmpresaId();
+    // Venta.empleadoId es FK a Empleado, no a Usuario -- mismo resolver que
+    // usa create() para el cobro normal (auto-provisiona el Empleado propio
+    // del OWNER la primera vez, si hace falta).
+    const empleadoRegistra = await this.resolveEmpleadoRegistra(usuarioRegistraId);
+
+    const lineas: LineaCalculada[] = [];
+    for (const s of cita.servicios) {
+      const { comisionPct, comisionMonto } = await this.calcComision(
+        cita.empleadoId,
+        s.servicioId,
+        s.precio,
+      );
+      lineas.push({
+        tipo: LineaTipo.SERVICIO,
+        servicioId: s.servicioId,
+        empleadoId: cita.empleadoId,
+        descripcion: '',
+        cantidad: 1,
+        precioUnit: s.precio,
+        descuento: 0,
+        subtotal: s.precio,
+        comisionPct,
+        comisionMonto,
+      });
+    }
+    // Defensa en profundidad: AgendaService ya bloqueó esta vía para citas
+    // de inquilino antes de llegar aquí, esto nunca debería disparar.
+    await this.validarFacturaLimpiaInquilino(lineas);
+
+    // Chequeos de fiao -- SOLO informativos, nunca bloquean este camino.
+    const cliente = await tx.cliente.findFirst({
+      where: { id: cita.clienteId },
+      select: { permiteFiao: true, limiteCredito: true },
+    });
+    const omitioPermiteFiao = !cliente?.permiteFiao;
+    const aggDeuda = await tx.venta.aggregate({
+      where: {
+        clienteId: cita.clienteId,
+        estado: { in: [VentaStatus.PENDIENTE, VentaStatus.ABONO_PARCIAL] },
+      },
+      _sum: { saldo: true },
+    });
+    const deudaActual = Number(aggDeuda._sum.saldo ?? 0);
+    const limite = Number(cliente?.limiteCredito ?? 0);
+    const montoExcedido = this.round(
+      Math.max(0, deudaActual + cita.total - limite),
+    );
+    const omitioLimiteCredito = montoExcedido > 0.01;
+
+    const numero = await this.nextNumero(tx, empresaId);
+    const sucursalId = cita.sucursalId ?? (await this.resolverSucursalPrincipal());
+
+    let nuevaVenta: { id: string };
+    try {
+      nuevaVenta = await tx.venta.create({
+        data: {
+          empresaId,
+          sucursalId,
+          clienteId: cita.clienteId,
+          citaId: cita.id,
+          empleadoId: empleadoRegistra.id,
+          numero,
+          origen: VentaOrigen.CITA,
+          subtotal: cita.subtotal,
+          descuento: cita.descuento,
+          itbis: cita.itbis,
+          total: cita.total,
+          saldo: cita.total,
+          estado: VentaStatus.PENDIENTE,
+          detalles: {
+            create: lineas.map((l) => ({
+              tipo: l.tipo,
+              servicioId: l.servicioId,
+              empleadoId: l.empleadoId,
+              descripcion: l.descripcion,
+              cantidad: l.cantidad,
+              precioUnit: l.precioUnit,
+              descuento: l.descuento,
+              subtotal: l.subtotal,
+              comisionPct: l.comisionPct,
+              comisionMonto: l.comisionMonto,
+            })),
+          },
+        },
+        select: { id: true },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new ConflictException('Esta cita ya fue cobrada.');
+      }
+      throw e;
+    }
+
+    await tx.movimientoCredito.create({
+      data: {
+        empresaId,
+        clienteId: cita.clienteId,
+        ventaId: nuevaVenta.id,
+        tipo: MovimientoCreditoTipo.CARGO,
+        monto: cita.total,
+        descripcion: `Cliente no pagó — Factura F${String(numero).padStart(7, '0')}`,
+      },
+    });
+    await this.actualizarDeudaCliente(tx, cita.clienteId);
+
+    await tx.cita.update({
+      where: { id: cita.id },
+      data: { estado: CitaStatus.COMPLETED, finalizadaSinCobro: false },
+    });
+
+    return {
+      ventaId: nuevaVenta.id,
+      numero,
+      omitioPermiteFiao,
+      omitioLimiteCredito,
+      montoExcedido,
+    };
+  }
+
   // ============ VENTA DESDE CITA ============
   async createFromCita(citaId: string) {
     const empresaId = getEmpresaId();
