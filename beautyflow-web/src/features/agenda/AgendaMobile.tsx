@@ -16,7 +16,7 @@ interface Cita {
   total: number; notas?: string | null;
   // Candado "una venta por cita" (Parte B): solo no-null si hay una venta
   // ACTIVA ligada.
-  venta?: { id: string; estado: string } | null;
+  venta?: { id: string; estado: string; saldo: number } | null;
   // Cortesía/servicio gratis (OWNER/ADMIN, PATCH .../finalizar-sin-cobro) —
   // solo puede ser true con estado FINALIZADA y sin venta.
   finalizadaSinCobro: boolean;
@@ -289,11 +289,25 @@ export function AgendaMobile() {
               {sel.notas && <div className={styles.detNota}>📝 {sel.notas}</div>}
             </div>
 
-            {sel.venta && (
+            {sel.venta && sel.venta.estado === 'PAGADA' && (
               <div className={styles.yaCobrada}>
                 <span>✓ Ya cobrada</span>
                 <button onClick={() => downloadPdf(`/facturas/${sel.venta!.id}/recibo`, 'recibo.pdf')}>
                   Ver recibo
+                </button>
+              </div>
+            )}
+            {/* Venta ligada pero no PAGADA (PENDIENTE/ABONO_PARCIAL): nace de
+                "Cliente no pagó" o de un fiao normal desde el POS — en
+                cualquier caso NO es "ya cobrada", se cobra desde Cuentas
+                por Cobrar (el candado de citaId único ya impide una
+                segunda venta para esta cita, así que no hay botón "Cobrar"
+                aquí, solo el enlace). */}
+            {sel.venta && sel.venta.estado !== 'PAGADA' && (
+              <div className={styles.yaCobrada}>
+                <span>Pendiente de cobro · RD$ {formatMoney(sel.venta.saldo)}</span>
+                <button onClick={() => navigate('/cuentas-por-cobrar')}>
+                  Ir a Cuentas por Cobrar
                 </button>
               </div>
             )}
@@ -396,6 +410,9 @@ export function AgendaMobile() {
       {sel && finalizandoSinCobro && (
         <FinalizarSinCobroModal
           citaId={sel.id}
+          total={sel.total}
+          clienteId={sel.cliente?.id}
+          esInquilino={esInquilinoAgenda(empleados.find(e => e.id === sel.empleado?.id))}
           onClose={() => setFinalizandoSinCobro(false)}
           onSuccess={() => {
             setFinalizandoSinCobro(false);

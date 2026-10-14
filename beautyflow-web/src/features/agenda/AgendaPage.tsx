@@ -19,7 +19,7 @@ interface Cita {
   notas: string | null;
   // Candado "una venta por cita" (Parte B): solo no-null si hay una venta
   // ACTIVA ligada (anular() limpia esto, ver ReprogramarModal.tsx).
-  venta: { id: string; estado: string } | null;
+  venta: { id: string; estado: string; saldo: number } | null;
   // Cortesía/servicio gratis (OWNER/ADMIN, PATCH .../finalizar-sin-cobro) —
   // solo puede ser true con estado FINALIZADA y sin venta.
   finalizadaSinCobro: boolean;
@@ -538,12 +538,24 @@ export function AgendaPage() {
                 )}
               </div>
 
-              {selCita.venta && (
+              {selCita.venta && selCita.venta.estado === 'PAGADA' && (
                 <div className={styles.yaCobrada}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg>
                   <span>Ya cobrada</span>
                   <button onClick={() => downloadPdf(`/facturas/${selCita.venta!.id}/recibo`, 'recibo.pdf')}>
                     Ver recibo
+                  </button>
+                </div>
+              )}
+              {/* Venta ligada pero no PAGADA (PENDIENTE/ABONO_PARCIAL): nace de
+                  "Cliente no pagó" o de un fiao normal desde el POS — no es
+                  "ya cobrada", se cobra desde Cuentas por Cobrar. */}
+              {selCita.venta && selCita.venta.estado !== 'PAGADA' && (
+                <div className={styles.yaCobrada}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
+                  <span>Pendiente de cobro · RD$ {formatMoney(selCita.venta.saldo)}</span>
+                  <button onClick={() => navigate('/cuentas-por-cobrar')}>
+                    Ir a Cuentas por Cobrar
                   </button>
                 </div>
               )}
@@ -663,6 +675,9 @@ export function AgendaPage() {
       {finalizandoSinCobro && selCita && (
         <FinalizarSinCobroModal
           citaId={selCita.id}
+          total={selCita.total}
+          clienteId={selCita.cliente?.id}
+          esInquilino={esInquilinoAgenda(empleados.find(e => e.id === selCita.empleado?.id))}
           onClose={() => setFinalizandoSinCobro(false)}
           onSuccess={() => {
             setFinalizandoSinCobro(false);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { formatMoney } from '../../lib/format';
 import styles from './AgendaPage.module.css';
 
 /**
@@ -161,18 +162,51 @@ export function ReprogramarModal({
  * un confirm() nativo, mismo cascarón de modal que ReprogramarModal arriba
  * — no se inventa un sistema de modales nuevo.
  */
+interface ClienteFiao {
+  id: string;
+  permiteFiao: boolean;
+  limiteCredito: number;
+  balancePendiente: number;
+}
+
 export function FinalizarSinCobroModal({
   citaId,
+  total,
+  clienteId,
+  esInquilino,
   onClose,
   onSuccess,
 }: {
   citaId: string;
+  /** Total de la cita — se muestra en el aviso de "Cliente no pagó" y se
+   * usa para calcular si excede el límite de crédito del cliente. */
+  total: number;
+  clienteId?: string | null;
+  /** Si el empleado de la cita es un inquilino, "Cliente no pagó" no se
+   * ofrece — su cobro pendiente se maneja desde su propio POS (fiao). */
+  esInquilino: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const [motivo, setMotivo] = useState('');
   const [nota, setNota] = useState('');
   const [err, setErr] = useState('');
+
+  const motivosDisponibles = esInquilino
+    ? MOTIVOS_SIN_COBRO.filter((m) => m.value !== 'CLIENTE_NO_PAGO')
+    : MOTIVOS_SIN_COBRO;
+
+  // Solo se consulta cuando hace falta avisar sobre fiao/límite — no para
+  // Cortesía/Otro, que no tocan nada del cliente.
+  const { data: cliente } = useQuery<ClienteFiao>({
+    queryKey: ['cliente-fiao', clienteId],
+    queryFn: () => api.get(`/clientes/${clienteId}`).then((r) => r.data),
+    enabled: motivo === 'CLIENTE_NO_PAGO' && !!clienteId,
+    staleTime: 30_000,
+  });
+  const excedeLimite =
+    !!cliente && cliente.balancePendiente + total > cliente.limiteCredito + 0.01;
+  const disponible = cliente ? Math.max(0, cliente.limiteCredito - cliente.balancePendiente) : 0;
 
   const finalizar = useMutation({
     mutationFn: () => api.patch(`/citas/${citaId}/finalizar-sin-cobro`, {
@@ -196,17 +230,37 @@ export function FinalizarSinCobroModal({
           </button>
         </div>
         <div className={styles.modalBody}>
-          <p>
-            Se marcará como Finalizada sin generar ninguna venta — úsalo solo para
-            cortesías o servicios gratuitos. Esta acción queda registrada en Auditoría.
-          </p>
+          {motivo === 'CLIENTE_NO_PAGO' ? (
+            <p>
+              Se registrará una deuda del cliente por <b>RD$ {formatMoney(total)}</b> en
+              Cuentas por Cobrar — la cita queda Finalizada con esa venta pendiente.
+              Esta acción queda registrada en Auditoría.
+            </p>
+          ) : (
+            <p>
+              Se marcará como Finalizada sin generar ninguna venta — úsalo solo para
+              cortesías o servicios gratuitos. Esta acción queda registrada en Auditoría.
+            </p>
+          )}
           <label className={styles.modalField}>
             <span>Motivo</span>
             <select value={motivo} onChange={(e) => setMotivo(e.target.value)}>
               <option value="" disabled>Elige un motivo…</option>
-              {MOTIVOS_SIN_COBRO.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              {motivosDisponibles.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </label>
+          {motivo === 'CLIENTE_NO_PAGO' && cliente && !cliente.permiteFiao && (
+            <p className={styles.modalErr}>
+              Este cliente no tiene crédito (fiao) habilitado en su ficha — igual se
+              registrará la deuda.
+            </p>
+          )}
+          {motivo === 'CLIENTE_NO_PAGO' && excedeLimite && (
+            <p className={styles.modalErr}>
+              Esto supera su límite de crédito (disponible: RD$ {formatMoney(disponible)}) —
+              igual se registrará.
+            </p>
+          )}
           <label className={styles.modalField}>
             <span>Nota (opcional)</span>
             <textarea
