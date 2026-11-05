@@ -6,6 +6,8 @@ networks:
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:
 
 x-logging: &default-logging
   driver: json-file
@@ -83,6 +85,12 @@ services:
       context: ./beautyflow-web
       dockerfile: Dockerfile
     restart: unless-stopped
+    environment:
+      # Local: ":80" (default si no se define). Producción: dominio(s)
+      # reales separados por coma, ej. "app.estixa.com, admin.estixa.com"
+      # — Caddy obtiene/renueva el certificado HTTPS automáticamente y
+      # necesita persistir ese estado en caddy_data (de ahí el volumen).
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     depends_on:
       backend:
         condition: service_healthy
@@ -91,6 +99,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80/ || exit 1"]
       interval: 10s

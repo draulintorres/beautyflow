@@ -1,8 +1,11 @@
-# Local: HTTP en :80 (sin dominio, sin TLS).
-# Producción: reemplazar ":80" por el dominio real (ej. app.estixa.com) y
-# Caddy obtiene/renueva el certificado HTTPS automáticamente — no requiere
-# configuración adicional de TLS.
-:80 {
+# Dirección del sitio desde la variable de entorno SITE_ADDRESS, con ":80"
+# como valor por defecto si no está definida (sintaxis {$VAR:default} —
+# verificada contra el binario real de Caddy: caddy validate, no de
+# memoria). Admite varias direcciones separadas por coma, ej.
+# "app.estixa.com, admin.estixa.com" — ahí Caddy obtiene/renueva el
+# certificado HTTPS automáticamente (requiere persistir /data, ver
+# docker-compose.yml). Local sigue funcionando en :80 (HTTP, sin TLS).
+{$SITE_ADDRESS::80} {
 	encode gzip
 
 	# Mismo origen: todo lo que empiece con /api va al backend, sin tocar
