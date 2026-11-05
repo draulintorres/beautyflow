@@ -1,0 +1,21 @@
+# Local: HTTP en :80 (sin dominio, sin TLS).
+# Producción: reemplazar ":80" por el dominio real (ej. app.estixa.com) y
+# Caddy obtiene/renueva el certificado HTTPS automáticamente — no requiere
+# configuración adicional de TLS.
+:80 {
+	encode gzip
+
+	# Mismo origen: todo lo que empiece con /api va al backend, sin tocar
+	# el path (el backend ya espera el prefijo api/v1 completo).
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	# El resto: estático de la SPA, con fallback a index.html para las
+	# rutas de react-router que no existen como archivo físico.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
