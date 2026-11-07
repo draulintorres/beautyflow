@@ -103,7 +103,17 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80/ || exit 1"]
+      # No usar http://localhost:80/: con un dominio real, Caddy redirige a
+      # https:// y el healthcheck falla por falta de certificado para
+      # "localhost" aunque el servicio esté sano. El puerto 2019 es la API
+      # de administración de Caddy (solo accesible dentro del contenedor,
+      # nunca publicada al host) — más confiable como sonda de salud.
+      # Usar 127.0.0.1 y NO "localhost": busybox wget (el wget de la
+      # imagen caddy:2-alpine) resuelve "localhost" primero a ::1 (IPv6),
+      # y la API de admin de Caddy solo escucha en IPv4 — con "localhost"
+      # da "Connection refused" aunque el servicio esté sano (verificado
+      # contra el servidor real).
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
       interval: 10s
       timeout: 5s
       retries: 10
