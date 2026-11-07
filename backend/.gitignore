@@ -15,6 +15,11 @@ backups/
 _backups/
 *.dump
 
+# Scripts locales de un solo uso (ej. rotación de SuperAdmin) — nunca se
+# versionan: son de ejecución manual, puntual, y no deben quedar en el
+# historial del repo.
+scripts/
+
 # Scripts sueltos de depuración de rondas anteriores (no son parte del
 # proyecto — quedaron del historial de desarrollo, no aportan a un
 # clon nuevo del repo)
