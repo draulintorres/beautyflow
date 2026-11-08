@@ -78,6 +78,13 @@ const SOFT_DELETE_MODELS = new Set<string>([
   // apareciendo en los listados — ver nota de TENANT_MODELS arriba.
   // (Notificacion no tiene deletedAt, por eso no entra en este segundo set.)
   'Cabina', 'CategoriaProducto', 'PlantillaNotificacion',
+  // BloqueoHorario: removeBloqueo() (empleados.service.ts) ya hace soft
+  // delete (deletedAt), pero al no estar aquí un bloqueo "eliminado" seguía
+  // contando como ocupado en DisponibilidadService#getDisponibilidad y
+  // seguía apareciendo en getBloqueos() — mismo patrón que la nota de
+  // arriba. Solo afecta lecturas (findMany/findFirst): el soft delete en sí
+  // (update) y el alta (create) no pasan por este filtro.
+  'BloqueoHorario',
 ]);
 
 /**

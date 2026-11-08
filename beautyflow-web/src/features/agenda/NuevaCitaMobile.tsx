@@ -276,6 +276,12 @@ export function NuevaCitaMobile({
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['agenda-mobile'] });
+      // ['disponibilidad'] por prefijo: cubre tanto esta misma ventana (si
+      // se vuelve a abrir sin recargar) como cualquier otra ya cacheada
+      // para el mismo empleado/fecha desde el otro punto de entrada
+      // (escritorio o móvil) — un solo lugar para crear, ya que ambos
+      // wrappers de Agenda abren este mismo componente.
+      qc.invalidateQueries({ queryKey: ['disponibilidad'] });
       onDone();
     },
     onError: (err: any) => {
