@@ -151,17 +151,27 @@ export class VentasService {
     // Empleado que registra (debe existir uno ligado al usuario o pasar el primero)
     const empleadoRegistra = await this.resolveEmpleadoRegistra(user.usuarioId);
 
-    // Alquiler de silla (Pieza 3): si quien crea la venta es un inquilino,
-    // se FUERZA el empleadoId de sus líneas de servicio al suyo propio —
-    // se ignora cualquier empleadoId que mande el cliente. Se hace ANTES
-    // de calcularLineas para que la comisión (si aplica) también se
-    // calcule contra el empleado real, no contra el que alguien intentó
-    // inyectar.
-    const inquilino = await this.inquilinoSvc.resolverInquilino(user);
-    const lineasDto = inquilino.esInquilino
+    // Alquiler de silla (ETAPA 4): si el ROL de quien crea la venta es
+    // ALQUILER, se FUERZA el empleadoId de sus líneas de servicio al suyo
+    // propio — se ignora cualquier empleadoId que mande el cliente. Fallo
+    // cerrado por rol (resolverPermisoAlquiler), no por el criterio de
+    // negocio modeloPago+config: antes, un rol ALQUILER con modeloPago mal
+    // configurado podía facturar un servicio a nombre de OTRO empleado
+    // mandando su id en el body. Se hace ANTES de calcularLineas para que
+    // la comisión (si aplica) también se calcule contra el empleado real.
+    // `empleadoRegistra` (arriba) ya garantiza que, si se llegó hasta
+    // aquí con rol ALQUILER, hay un Empleado vinculado — este chequeo es
+    // defensa en profundidad, nunca debería disparar.
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler(user);
+    if (permisoAlquiler.restringido && !permisoAlquiler.empleadoId) {
+      throw new BadRequestException(
+        'Su usuario (rol Inquilino) no tiene un empleado vinculado. Pida que lo vinculen desde Equipo antes de poder cobrar.',
+      );
+    }
+    const lineasDto = permisoAlquiler.restringido
       ? dto.lineas.map((l) =>
           l.tipo === LineaTipo.SERVICIO
-            ? { ...l, empleadoId: inquilino.empleadoId! }
+            ? { ...l, empleadoId: permisoAlquiler.empleadoId! }
             : l,
         )
       : dto.lineas;
@@ -892,13 +902,15 @@ export class VentasService {
     });
     if (!venta) throw new NotFoundException('Venta no encontrada');
 
-    // Alquiler de silla (Pieza 3): un inquilino no puede ver el detalle de
-    // una venta que no sea suya — 404 para no revelar su existencia.
-    const inquilino = await this.inquilinoSvc.resolverInquilino();
-    if (inquilino.esInquilino) {
-      const esSuya = venta.detalles.some(
-        (d) => d.empleadoId === inquilino.empleadoId,
-      );
+    // Alquiler de silla (ETAPA 4): fallo cerrado por ROL
+    // (resolverPermisoAlquiler) — un rol ALQUILER no puede ver el detalle
+    // de una venta que no sea suya, ni sin empleado vinculado (ahí nunca
+    // es "suya", por eso el chequeo de abajo no usa == con null).
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (permisoAlquiler.restringido) {
+      const esSuya =
+        !!permisoAlquiler.empleadoId &&
+        venta.detalles.some((d) => d.empleadoId === permisoAlquiler.empleadoId);
       if (!esSuya) throw new NotFoundException('Venta no encontrada');
     }
 
@@ -918,12 +930,18 @@ export class VentasService {
     estado?: VentaStatus;
     empleadoId?: string;
   }) {
-    // Alquiler de silla (Pieza 3): un inquilino solo ve ventas con líneas
-    // suyas — se ignora cualquier empleadoId que mande el cliente y se
-    // fuerza al propio.
-    const inquilino = await this.inquilinoSvc.resolverInquilino();
-    const empleadoId = inquilino.esInquilino
-      ? inquilino.empleadoId!
+    // Alquiler de silla (ETAPA 4): fallo cerrado por ROL
+    // (resolverPermisoAlquiler) — un rol ALQUILER solo ve ventas con
+    // líneas suyas, se ignora cualquier empleadoId que mande el cliente y
+    // se fuerza al propio. Sin empleado vinculado, ninguna venta (el
+    // `where` de abajo con empleadoId undefined dejaría ver todas, así
+    // que se corta antes con lista vacía).
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (permisoAlquiler.restringido && !permisoAlquiler.empleadoId) {
+      return [];
+    }
+    const empleadoId = permisoAlquiler.restringido
+      ? permisoAlquiler.empleadoId!
       : filtros.empleadoId;
 
     const where: Prisma.VentaWhereInput = {};

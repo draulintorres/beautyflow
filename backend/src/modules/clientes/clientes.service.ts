@@ -11,6 +11,7 @@ import {
 } from './dto/cliente.dto';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
+import { InquilinoService } from '../../core/auth/inquilino.service';
 import { CitaStatus, VentaStatus } from '@prisma/client';
 import { ENUM_TO_ESTADO_ES } from '../agenda/dto/cita.dto';
 
@@ -19,6 +20,7 @@ export class ClientesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sucursalScope: SucursalScopeService,
+    private readonly inquilinoSvc: InquilinoService,
   ) {}
 
   // ---------- LISTAR (con filtro de etiqueta y búsqueda) ----------
@@ -163,11 +165,29 @@ export class ClientesService {
   // ---------- HISTORIAL DE CITAS ----------
   async getCitas(id: string) {
     await this.ensureExists(id);
+
+    // Alquiler de silla (ETAPA 4): fallo cerrado por ROL
+    // (resolverPermisoAlquiler) — antes este filtro solo existía en el
+    // frontend (AgendaPage.tsx#historialVisible); un rol ALQUILER mal
+    // configurado podía ver el historial completo del cliente, incluidas
+    // citas con otros empleados, con solo llamar a la API directo. Sin
+    // empleado vinculado, historial vacío.
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (permisoAlquiler.restringido && !permisoAlquiler.empleadoId) {
+      return [];
+    }
+
     // Aislamiento por sucursal: el historial de citas del cliente que ve un
     // usuario aislado es solo el de SU sucursal.
     const suc = await this.sucursalScope.whereSucursal();
     const citas = await this.prisma.db.cita.findMany({
-      where: { clienteId: id, ...suc },
+      where: {
+        clienteId: id,
+        ...suc,
+        ...(permisoAlquiler.restringido && {
+          empleadoId: permisoAlquiler.empleadoId!,
+        }),
+      },
       include: {
         // id agregado (aditivo): el panel lateral de Agenda lo necesita
         // para saber si esta cita es de un inquilino y poder ocultarla

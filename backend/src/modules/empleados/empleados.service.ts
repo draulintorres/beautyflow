@@ -4,7 +4,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { ComisionBase, ModeloPago } from '@prisma/client';
+import { ComisionBase, ModeloPago, RoleKey } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import {
@@ -155,6 +155,20 @@ export class EmpleadosService {
     }
     if (dto.sucursalId) {
       await this.validateSucursal(dto.sucursalId);
+    }
+
+    // Corrección (ETAPA 4): solo se valida rol↔modeloPago cuando ESTA
+    // operación cambia el modeloPago — editar otro campo de un empleado
+    // que ya quedó inconsistente por otra vía (ej. un acceso creado antes
+    // de este fix) no debe fallar.
+    if (dto.modeloPago !== undefined) {
+      const conUsuario = await this.prisma.db.empleado.findFirst({
+        where: { id },
+        select: { usuario: { select: { rol: { select: { roleKey: true } } } } },
+      });
+      if (conUsuario?.usuario) {
+        this.assertRolModeloPagoCompatibles(dto.modeloPago, conUsuario.usuario.rol.roleKey);
+      }
     }
 
     return this.prisma.db.empleado.update({
@@ -382,6 +396,17 @@ export class EmpleadosService {
   async setComisionUi(id: string, dto: SetComisionUiDto) {
     const empleado = await this.ensureExists(id);
 
+    // Corrección (ETAPA 4): este endpoint SIEMPRE fija el modeloPago (es
+    // obligatorio en el DTO), así que la validación rol↔modeloPago corre
+    // siempre que haya un usuario vinculado — ver assertRolModeloPagoCompatibles.
+    const conUsuario = await this.prisma.db.empleado.findFirst({
+      where: { id },
+      select: { usuario: { select: { rol: { select: { roleKey: true } } } } },
+    });
+    if (conUsuario?.usuario) {
+      this.assertRolModeloPagoCompatibles(dto.modeloPago, conUsuario.usuario.rol.roleKey);
+    }
+
     // Validaciones ANTES de cualquier mutación
     if (dto.overrides && dto.overrides.length > 0) {
       const ids = dto.overrides.map((o) => o.servicioId);
@@ -469,7 +494,7 @@ export class EmpleadosService {
     // Verificar empleado existe y no tiene acceso
     const empleado = await this.prisma.db.empleado.findFirst({
       where: { id },
-      select: { id: true, nombre: true, usuarioId: true },
+      select: { id: true, nombre: true, usuarioId: true, modeloPago: true },
     });
     if (!empleado) throw new NotFoundException('Empleado no encontrado');
     if (empleado.usuarioId) {
@@ -490,6 +515,13 @@ export class EmpleadosService {
     // Rol válido
     const rol = await this.prisma.db.rol.findFirst({ where: { id: dto.rolId } });
     if (!rol) throw new BadRequestException('Rol no válido');
+
+    // Corrección (ETAPA 4): rol ALQUILER y modeloPago ALQUILER deben ir
+    // siempre juntos — esta es la causa confirmada en staging del bug de
+    // "ve la agenda de todo el salón" (un empleado modeloPago ALQUILER
+    // recibió acceso con rol BARBERO). Se valida SIEMPRE al crear acceso
+    // (esta operación fija el rol por primera vez).
+    this.assertRolModeloPagoCompatibles(empleado.modeloPago, rol.roleKey);
 
     const tempPassword = this.generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 12);
@@ -616,6 +648,29 @@ export class EmpleadosService {
     });
     if (yaAsignado) {
       throw new ConflictException('Ese usuario ya está asociado a otro empleado');
+    }
+  }
+
+  /**
+   * Corrección (ETAPA 4): rol ALQUILER ⇔ modeloPago ALQUILER deben ir
+   * siempre juntos — rompe el fallo cerrado por rol de
+   * InquilinoService#resolverPermisoAlquiler si se desincronizan (ver ese
+   * archivo). Se llama SOLO desde las operaciones que cambian el rol o el
+   * modeloPago (crearAcceso, update/setComisionUi cuando dto.modeloPago
+   * viene, usuarios.service.ts#update cuando dto.rolId viene) — nunca al
+   * editar otro campo de un empleado/usuario ya inconsistente por otra
+   * vía, para no bloquear la corrección ni dejarlo atascado.
+   */
+  private assertRolModeloPagoCompatibles(modeloPago: ModeloPago, rolKey: RoleKey) {
+    if (modeloPago === ModeloPago.ALQUILER && rolKey !== RoleKey.ALQUILER) {
+      throw new BadRequestException(
+        'Este empleado es inquilino: el acceso debe usar el rol Inquilino.',
+      );
+    }
+    if (rolKey === RoleKey.ALQUILER && modeloPago !== ModeloPago.ALQUILER) {
+      throw new BadRequestException(
+        'Primero configura a este empleado como inquilino en Equipo.',
+      );
     }
   }
 
