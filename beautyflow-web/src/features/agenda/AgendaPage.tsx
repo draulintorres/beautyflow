@@ -47,6 +47,30 @@ interface CitaHistorial {
 // La rejilla cubre de START_H a END_H (END_H exclusivo, igual que nowTop más
 // abajo): con START_H=8 y END_H=22, la última fila es 21:00-22:00.
 const START_H = 8, END_H = 22, SLOT_H = 62, CAL_HDR = 54;
+// Tarjeta de cita "compacta" (ETAPA 9/9b): por debajo de este alto no
+// entran las 2 líneas completas (hora + nombre) con el padding actual
+// de .appt (6px arriba y abajo = 12px).
+//
+// Verificado (no asumido) que ningún ancestro de .appt/.apptTime/
+// .apptClient declara line-height -- ni body ni el reset `* {}` de
+// tokens.css -- así que el valor real es el `normal` del navegador,
+// que depende de las métricas propias de cada fuente: JetBrains Mono
+// (.apptTime) e Inter (.apptClient, heredado de body), ambas de
+// Google Fonts (index.html:46). Para esas dos fuentes en particular
+// ese `normal` está documentado en ~1.2× -- no un 1.2 genérico de CSS.
+// Cuenta con ese valor:
+//   .apptTime (9.5px × 1.2 = 11.4px) + margin-bottom 1px
+//   .apptClient (11.5px × 1.2 = 13.8px)
+//   => 26.2px de contenido + 12px de padding = 38.2px mínimo real.
+// 40px redondea hacia arriba con ~1.8px de margen. Chequeo explícito
+// pedido: una cita de 45 min (42.5px, durationPx) SÍ entra completa en
+// el diseño normal (42.5 ≥ 38.2, sobran ~4.3px) -- se queda por encima
+// del umbral, no pasa a compacto. Una de 30 min (27px) y la mínima
+// (22px) quedan siempre por debajo -> van al diseño compacto de una
+// sola línea (.apptCompact en el CSS), que fija line-height:1.2
+// explícito en sus 3 reglas para que esa cuenta sea cierta sin
+// depender de este mismo valor heredado.
+const APPT_COMPACT_THRESHOLD = 40;
 const HOURS = Array.from({ length: END_H - START_H }, (_, i) => START_H + i);
 const AV_GRADIENTS = [
   'linear-gradient(135deg,#E4CB8A,#a07f33)',
@@ -465,17 +489,35 @@ export function AgendaPage() {
                       ))}
                       {(citasByEmp[emp.id] ?? []).map(cita => {
                         const cls = ESTADO_CLS[cita.estado] ?? 'Pend';
+                        const alturaPx = durationPx(cita.horaInicio, cita.horaFin);
+                        const compacta = alturaPx < APPT_COMPACT_THRESHOLD;
+                        // Tooltip nativo: solo en modo compacto, donde el
+                        // nombre (y el servicio) pueden quedar truncados por
+                        // el ellipsis -- en el diseño normal ya se leen completos.
+                        const tituloCompleto = compacta
+                          ? [cita.cliente?.nombre, cita.servicios[0]?.nombre].filter(Boolean).join(' — ')
+                          : undefined;
                         return (
                           <div
                             key={cita.id}
-                            className={`${styles.appt} ${styles[`appt${cls}`] ?? ''} ${cita.id === selId ? styles.apptSel : ''}`}
-                            style={{ top: timeToTop(cita.horaInicio), height: durationPx(cita.horaInicio, cita.horaFin) }}
+                            className={`${styles.appt} ${styles[`appt${cls}`] ?? ''} ${cita.id === selId ? styles.apptSel : ''} ${compacta ? styles.apptCompact : ''}`}
+                            style={{ top: timeToTop(cita.horaInicio), height: alturaPx }}
                             onClick={() => setSelId(cita.id === selId ? null : cita.id)}
+                            title={tituloCompleto}
                           >
-                            <div className={styles.apptTime}>{labelTime12(cita.horaInicio)}</div>
-                            <div className={styles.apptClient}>{cita.cliente?.nombre}</div>
-                            {cita.servicios[0] && (
-                              <div className={styles.apptSvc}>{cita.servicios[0].nombre}</div>
+                            {compacta ? (
+                              <div className={styles.apptCompactRow}>
+                                <span className={styles.apptTimeCompact}>{labelTime12(cita.horaInicio)}</span>
+                                <span className={styles.apptClientCompact}>{cita.cliente?.nombre}</span>
+                              </div>
+                            ) : (
+                              <>
+                                <div className={styles.apptTime}>{labelTime12(cita.horaInicio)}</div>
+                                <div className={styles.apptClient}>{cita.cliente?.nombre}</div>
+                                {cita.servicios[0] && (
+                                  <div className={styles.apptSvc}>{cita.servicios[0].nombre}</div>
+                                )}
+                              </>
                             )}
                           </div>
                         );

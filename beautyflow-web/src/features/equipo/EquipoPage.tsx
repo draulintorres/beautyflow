@@ -89,6 +89,18 @@ function avatarBg(nombre: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
+// Mismo formato 12h que ya usa Agenda (AgendaPage.tsx#labelTime12,
+// AgendaMobile.tsx#toAmPm) -- no se pudo importar sin exportar esas
+// funciones desde un archivo de otra feature, así que se duplica aquí
+// a propósito (misma fórmula). Solo cambia el TEXTO mostrado -- el
+// valor guardado sigue en HH:mm 24h, sin tocar.
+function hhmmToAmPm(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const period = h < 12 ? 'AM' : 'PM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
 const errMsg = (e: unknown) => {
   const msg = (e as any)?.response?.data?.message;
   if (msg) return Array.isArray(msg) ? msg.join(' · ') : String(msg);
@@ -990,7 +1002,7 @@ function ComisionTab({
 
 // ── IntegranteDrawer ───────────────────────────────────────
 function IntegranteDrawer({
-  data, initialTab = 'datos', sucursales, servicios, onClose, onSuccess,
+  data, initialTab = 'datos', sucursales, servicios, onClose, onSuccess, onToast,
 }: {
   data?: Integrante;
   initialTab?: Tab;
@@ -998,6 +1010,11 @@ function IntegranteDrawer({
   servicios: Servicio[];
   onClose: () => void;
   onSuccess: () => void;
+  /** Mismo useToast() del padre (EquipoPage) -- se reutiliza en vez de
+   *  crear un sistema de avisos nuevo. Guardar en Horarios/Especialidades
+   *  no cierra el drawer (a diferencia de la pestaña Datos), así que
+   *  necesita avisar sin depender de onSuccess/onClose. */
+  onToast: (msg: string, ok?: boolean) => void;
 }) {
   const isEdit = !!data;
   const qc = useQueryClient();
@@ -1094,6 +1111,7 @@ function IntegranteDrawer({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['equipo-detalle', savedId] });
       setHorariosErr('');
+      onToast('Horarios guardados.');
     },
     onError: (e) => setHorariosErr(errMsg(e)),
   });
@@ -1104,6 +1122,7 @@ function IntegranteDrawer({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['equipo-detalle', savedId] });
       setEspErr('');
+      onToast('Especialidades guardadas.');
     },
     onError: (e) => setEspErr(errMsg(e)),
   });
@@ -1256,7 +1275,7 @@ function IntegranteDrawer({
               ) : (
                 <>
                   <p className={styles.espHint}>
-                    Dejamos un horario inicial de 8:00 a. m. a 10:00 p. m., de lunes a domingo.
+                    Dejamos un horario inicial de {hhmmToAmPm('08:00')} a {hhmmToAmPm('22:00')}, de lunes a domingo.
                     Ajústalo a lo que realmente trabaja este empleado y guarda los cambios.
                   </p>
                   <div className={styles.horariosGrid}>
@@ -1283,7 +1302,7 @@ function IntegranteDrawer({
                     ))}
                   </div>
                   <button type="button" className={styles.btnApplyLV} onClick={aplicarLV}>
-                    Aplicar 09:00–18:00 a Lun–Vie
+                    Aplicar {hhmmToAmPm('09:00')}–{hhmmToAmPm('18:00')} a Lun–Vie
                   </button>
                   {horariosErr && <p className={styles.modalErr}>{horariosErr}</p>}
                 </>
@@ -2023,6 +2042,7 @@ export function EquipoPage() {
           sucursales={sucursales}
           servicios={servicios}
           onClose={() => setDrawerTarget(null)}
+          onToast={showToast}
           onSuccess={() => {
             showToast(drawerTarget.data === 'new' ? 'Integrante creado.' : 'Integrante actualizado.');
             setDrawerTarget(null);

@@ -388,10 +388,20 @@
 .horarioDayCheck input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--gold); cursor: pointer; flex-shrink: 0; }
 .horarioDayLabel { font-size: 13px; font-weight: 500; min-width: 80px; }
 .horarioTimes { display: flex; align-items: center; gap: 8px; }
+/* Ancho (ETAPA 9/9b): el control nativo <input type="time"> en formato
+   12h muestra "08:00 AM" + el ícono de reloj del propio navegador, que
+   nuestro CSS no puede medir exacto pero sí debe darle espacio de sobra.
+   Cuenta aproximada a 13px monospace: texto "08:00 AM" (8 caracteres)
+   ~8×7.8px ≈ 62px, + margen interno de los segmentos del control nativo
+   ≈ 8px (~70px texto) + ícono de reloj del navegador ≈ 20-24px + relleno
+   propio (10px×2=20px) + borde (1px×2=2px) ≈ 114px mínimo. Antes estaba
+   en 100px (por eso se recortaba) -- se sube a 130px, con ~16px de
+   margen de seguridad sobre esa cuenta.
+*/
 .timeInput {
   background: var(--field); border: 1px solid var(--line); border-radius: 7px;
   padding: 6px 10px; color: var(--text); font-size: 13px; font-family: var(--font-mono, monospace);
-  outline: none; width: 100px; max-width: 100%; min-width: 0; text-align: center;
+  outline: none; width: 130px; max-width: 100%; min-width: 0; text-align: center;
   box-sizing: border-box;
 }
 .timeInput:focus { border-color: var(--gold); }
@@ -539,7 +549,16 @@
   .btnNew { justify-content: center; }
   .horarioRow { flex-direction: column; align-items: stretch; }
   .horarioTimes { flex-wrap: nowrap; width: 100%; }
-  .timeInput { width: 0; flex: 1 1 0; }
+  /* Cuenta a 360px de viewport: .tabContent (padding 22px×2) y
+     .horarioRow (padding 14px×2, ya en flex-direction:column, así que
+     .horarioTimes toma el ancho completo de la fila) dejan ~288px;
+     menos el separador "–" y los 2 gaps de 8px (~26px), quedan ~262px
+     para los 2 campos -> ~131px cada uno (flex:1 1 0, reparto igual),
+     ya en línea con el ancho de escritorio. A 320px (el angosto típico
+     más chico) baja a ~111px -- más ajustado, por eso se achica el
+     relleno horizontal acá (10px->4px por lado) para dejarle más sitio
+     al texto/ícono del control nativo sin tocar el ancho total de la fila. */
+  .timeInput { width: 0; flex: 1 1 0; padding: 6px 4px; }
   .summaryGrid { grid-template-columns: repeat(2, 1fr); }
   .tempPwd { font-size: 16px; }
   .filterSelects { flex-direction: column; }
