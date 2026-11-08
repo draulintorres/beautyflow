@@ -32,6 +32,9 @@ interface Integrante {
   usuario: IntegranteUsuario | null;
   _count: { especialidades: number };
   especialidades: { servicio: { id: string; nombre: string } }[];
+  // Ya viaja en GET /empleados (escalar) — se agrega al tipo para poder
+  // preseleccionar el rol Inquilino en el modal de Crear acceso.
+  modeloPago?: 'COMISION' | 'SUELDO_FIJO' | 'ALQUILER';
 }
 
 interface IntegranteDetalle extends Integrante {
@@ -236,7 +239,14 @@ function CrearAccesoModal({
   onSuccess: (tempPwd: string) => void;
 }) {
   const [email, setEmail] = useState('');
-  const [rolId, setRolId] = useState('');
+  // Corrección (ETAPA 4): si el empleado ya es modeloPago ALQUILER,
+  // preseleccionar el rol Inquilino — mismo bug que causó el problema
+  // original (acceso creado con un rol distinto al modelo de pago real).
+  const [rolId, setRolId] = useState(() =>
+    integrante.modeloPago === 'ALQUILER'
+      ? roles.find(r => r.roleKey === 'ALQUILER')?.id ?? ''
+      : '',
+  );
   const [err, setErr] = useState('');
   const qc = useQueryClient();
 

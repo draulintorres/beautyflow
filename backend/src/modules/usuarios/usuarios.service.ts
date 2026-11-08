@@ -7,6 +7,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { UpdateUsuarioDto, ResetUsuarioPasswordDto } from './dto/usuario.dto';
 import { getCurrentUser } from '../../core/tenant/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
+import { ModeloPago, RoleKey } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
@@ -45,6 +46,18 @@ export class UsuariosService {
     if (dto.rolId) {
       const rol = await this.prisma.db.rol.findFirst({ where: { id: dto.rolId } });
       if (!rol) throw new BadRequestException('Rol no válido');
+
+      // Corrección (ETAPA 4): rol ALQUILER ⇔ modeloPago ALQUILER deben ir
+      // siempre juntos (ver empleados.service.ts#assertRolModeloPagoCompatibles
+      // para el porqué). Se valida SOLO porque esta operación cambia el
+      // rol — editar otro campo de un usuario ya inconsistente no falla.
+      const empleadoVinculado = await this.prisma.db.empleado.findFirst({
+        where: { usuarioId: id },
+        select: { modeloPago: true },
+      });
+      if (empleadoVinculado) {
+        this.assertRolModeloPagoCompatibles(empleadoVinculado.modeloPago, rol.roleKey);
+      }
     }
 
     const usuario = await this.prisma.db.usuario.update({
@@ -175,6 +188,21 @@ export class UsuariosService {
   private generateTempPassword(): string {
     // 10 chars alfanuméricos legibles
     return randomBytes(8).toString('base64url').slice(0, 10);
+  }
+
+  /** Ver empleados.service.ts#assertRolModeloPagoCompatibles — misma regla,
+   *  duplicada a propósito (sin dependencia entre los dos módulos). */
+  private assertRolModeloPagoCompatibles(modeloPago: ModeloPago, rolKey: RoleKey) {
+    if (modeloPago === ModeloPago.ALQUILER && rolKey !== RoleKey.ALQUILER) {
+      throw new BadRequestException(
+        'Este empleado es inquilino: el acceso debe usar el rol Inquilino.',
+      );
+    }
+    if (rolKey === RoleKey.ALQUILER && modeloPago !== ModeloPago.ALQUILER) {
+      throw new BadRequestException(
+        'Primero configura a este empleado como inquilino en Equipo.',
+      );
+    }
   }
 
   private toResponse(u: any) {
