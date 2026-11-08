@@ -139,6 +139,41 @@
 .apptClient { font-weight: 600; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .apptSvc { font-size: 10px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* Diseño compacto (ETAPA 9/9b): citas muy cortas (< 40px, ver
+   APPT_COMPACT_THRESHOLD en AgendaPage.tsx) no tienen alto para las 2
+   líneas normales -- el nombre quedaba cortado a la mitad por el
+   overflow:hidden de .appt, sin ni llegar a mostrar el "...". Acá se
+   reduce el padding vertical de 6px a 3px (6px totales en vez de 12px)
+   y todo pasa a una sola fila "hora · nombre" con ellipsis horizontal
+   de verdad (texto completo siempre disponible en el title=... nativo
+   de la tarjeta).
+
+   line-height EXPLÍCITO (1.2) en las 3 reglas de abajo -- a propósito,
+   no asumido: revisado que ningún ancestro (body, el reset `* {}` de
+   tokens.css, ni .appt) declara line-height en absoluto, así que sin
+   esto el valor real sería el `normal` del navegador, que depende de
+   las métricas internas de la fuente (JetBrains Mono para la hora,
+   Inter para el nombre -- ambas de Google Fonts, index.html:46) y no
+   es algo que esta hoja de estilos pueda garantizar. Fijándolo acá, la
+   cuenta de abajo es cierta sea cual sea ese valor heredado:
+     - .apptClientCompact: 11.5px × 1.2 = 13.8px de alto de línea, fijo.
+     - 30 min (27px de alto): 27 - 6 (padding) = 21px de contenido
+       disponible -> sobran ~7px sobre los 13.8px de la línea.
+     - Mínimo absoluto de cualquier cita (22px, el Math.max(...,22) de
+       durationPx): 22 - 6 = 16px de contenido -> sobran ~2px, ajustado
+       pero sin recortar.
+*/
+.appt.apptCompact { padding: 3px 8px; display: flex; align-items: center; }
+.apptCompactRow {
+  display: flex; align-items: baseline; gap: 5px; min-width: 0;
+  overflow: hidden; white-space: nowrap; width: 100%; line-height: 1.2;
+}
+.apptTimeCompact { font-family: var(--font-mono); font-size: 9.5px; opacity: .85; flex-shrink: 0; line-height: 1.2; }
+.apptClientCompact {
+  font-weight: 600; font-size: 11.5px; min-width: 0; line-height: 1.2;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 .apptPend { border-color: var(--st-pend); background: linear-gradient(135deg,rgba(217,165,49,.2),rgba(217,165,49,.06)); }
 .apptConf { border-color: var(--ok);      background: linear-gradient(135deg,rgba(29,158,117,.2),rgba(29,158,117,.06)); }
 .apptProc { border-color: var(--info);    background: linear-gradient(135deg,rgba(56,120,199,.2),rgba(56,120,199,.06)); }
