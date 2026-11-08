@@ -81,15 +81,24 @@ export class AgendaService {
   async create(dto: CreateCitaDto) {
     const empresaId = getEmpresaId();
 
-    // Corrección (agenda del inquilino): si quien crea es un inquilino, se
+    // Corrección (agenda del inquilino, ETAPA 4): si el ROL es ALQUILER, se
     // FUERZA el empleadoId de la cita al suyo — se ignora silenciosamente
-    // cualquier empleadoId que mande el cliente. Mismo enfoque que las
-    // líneas del POS en Pieza 3 (forzar > rechazar: más robusto y no
-    // requiere que el frontend adivine bien antes de enviar).
-    const inquilino = await this.inquilinoSvc.resolverInquilino();
+    // cualquier empleadoId que mande el cliente. Fallo cerrado por rol
+    // (resolverPermisoAlquiler), no por el criterio de negocio
+    // modeloPago+config (resolverInquilino) — un rol ALQUILER mal
+    // configurado (modeloPago distinto) ya no puede crear una cita a
+    // nombre de otro empleado con solo mandar su id en el body. Sin
+    // Empleado vinculado no puede crear ninguna cita (antes esto rechazaba
+    // solo si además faltaba dto.empleadoId; ahora rechaza siempre).
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
     let empleadoId: string;
-    if (inquilino.esInquilino) {
-      empleadoId = inquilino.empleadoId!;
+    if (permisoAlquiler.restringido) {
+      if (!permisoAlquiler.empleadoId) {
+        throw new BadRequestException(
+          'Su usuario (rol Inquilino) no tiene un empleado vinculado. Pida que lo vinculen desde Equipo antes de poder agendar.',
+        );
+      }
+      empleadoId = permisoAlquiler.empleadoId;
     } else if (dto.empleadoId) {
       empleadoId = dto.empleadoId;
     } else {
@@ -241,19 +250,25 @@ export class AgendaService {
 
   // ---------- CONSULTAR AGENDA ----------
   /**
-   * Alquiler de silla (Pieza 3): si quien consulta es un inquilino, el
-   * empleadoId que venga en el query se IGNORA por completo y se fuerza al
-   * suyo — un inquilino nunca puede ver la agenda de otro, ni manipulando
-   * la petición.
+   * Alquiler de silla (ETAPA 3/4): si el ROL de quien consulta es
+   * ALQUILER, el empleadoId que venga en el query se IGNORA por completo y
+   * se fuerza al suyo — fallo cerrado por rol (resolverPermisoAlquiler),
+   * no por el criterio de negocio modeloPago+config. Un rol ALQUILER sin
+   * Empleado vinculado no ve ninguna cita (lista vacía), nunca todo el
+   * salón — antes de esta corrección, un rol ALQUILER con modeloPago mal
+   * configurado caía en "sin restricción" y veía la agenda completa.
    */
   async findByFecha(
     fecha: string,
     empleadoIdQuery?: string,
     sucursalIdQuery?: string,
   ) {
-    const inquilino = await this.inquilinoSvc.resolverInquilino();
-    const empleadoId = inquilino.esInquilino
-      ? inquilino.empleadoId!
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (permisoAlquiler.restringido && !permisoAlquiler.empleadoId) {
+      return [];
+    }
+    const empleadoId = permisoAlquiler.restringido
+      ? permisoAlquiler.empleadoId!
       : empleadoIdQuery;
 
     const { inicio: dayStart, fin: dayEnd } = rangoDiaRD(fecha);
@@ -291,8 +306,13 @@ export class AgendaService {
     });
     if (!cita) throw new NotFoundException('Cita no encontrada');
 
-    const inquilino = await this.inquilinoSvc.resolverInquilino();
-    if (inquilino.esInquilino && cita.empleadoId !== inquilino.empleadoId) {
+    // Fallo cerrado por rol (ver findByFecha): sin empleado vinculado,
+    // cita.empleadoId !== null siempre es true, así que también cae acá.
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (
+      permisoAlquiler.restringido &&
+      cita.empleadoId !== permisoAlquiler.empleadoId
+    ) {
       throw new NotFoundException('Cita no encontrada');
     }
     return this.toResponse(cita);
@@ -618,7 +638,7 @@ export class AgendaService {
       include: { servicios: true },
     });
     if (!cita) throw new NotFoundException('Cita no encontrada');
-    const inquilino = await this.assertPropiaSiInquilino(cita.empleadoId);
+    const permisoAlquiler = await this.assertPropiaSiInquilino(cita.empleadoId);
 
     if (
       cita.estado === CitaStatus.COMPLETED ||
@@ -630,16 +650,17 @@ export class AgendaService {
       );
     }
 
-    // Un inquilino nunca reasigna su cita a otro empleado, aunque lo mande
-    // en el body — se fuerza a que siga siendo la suya.
-    const empleadoId = inquilino.esInquilino
+    // Un rol ALQUILER nunca reasigna su cita a otro empleado, aunque lo
+    // mande en el body — se fuerza a que siga siendo la suya (fallo
+    // cerrado por rol, no por el criterio de negocio).
+    const empleadoId = permisoAlquiler.restringido
       ? cita.empleadoId
       : (dto.empleadoId ?? cita.empleadoId);
     // Si se está reasignando a otro empleado, confirmar que es de esta
     // empresa (Parte B de la auditoría de aislamiento, 2026-09-11) — antes
     // no se validaba, así que un empleadoId de otra empresa quedaba escrito
     // tal cual en Cita.empleadoId.
-    if (!inquilino.esInquilino && dto.empleadoId && dto.empleadoId !== cita.empleadoId) {
+    if (!permisoAlquiler.restringido && dto.empleadoId && dto.empleadoId !== cita.empleadoId) {
       const empleadoNuevo = await this.prisma.db.empleado.findFirst({
         where: { id: dto.empleadoId },
         select: { id: true },
@@ -787,17 +808,23 @@ export class AgendaService {
   }
 
   /**
-   * Corrección (agenda del inquilino): si quien opera es un inquilino y la
-   * cita no es suya, 404 (no revelar existencia) — mismo patrón que el
-   * resto de Pieza 3. Devuelve la identidad resuelta para que el llamador
-   * la reutilice (evita resolverla dos veces).
+   * Corrección (agenda del inquilino, ETAPA 4): fallo cerrado por ROL
+   * (resolverPermisoAlquiler), no por el criterio de negocio
+   * modeloPago+config — si el rol es ALQUILER y la cita no es suya (o no
+   * tiene empleado vinculado), 404 (no revelar existencia). Usado por
+   * changeEstado, cancelar y reschedule, así que cierra los tres de una
+   * vez. Devuelve el permiso resuelto para que el llamador lo reutilice
+   * (evita resolverlo dos veces).
    */
   private async assertPropiaSiInquilino(citaEmpleadoId: string) {
-    const inquilino = await this.inquilinoSvc.resolverInquilino();
-    if (inquilino.esInquilino && citaEmpleadoId !== inquilino.empleadoId) {
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (
+      permisoAlquiler.restringido &&
+      citaEmpleadoId !== permisoAlquiler.empleadoId
+    ) {
       throw new NotFoundException('Cita no encontrada');
     }
-    return inquilino;
+    return permisoAlquiler;
   }
 
   private fullInclude(): Prisma.CitaInclude {

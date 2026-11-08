@@ -82,14 +82,20 @@ export class AlquilerService {
   // ---------- Deudas ----------
 
   /**
-   * Alquiler de silla (Pieza 3): si quien consulta es un inquilino, se
-   * ignora el empleadoId del query y se fuerza al suyo — nunca ve deudas
-   * de otro inquilino. El dueño/admin sigue viendo las de todos.
+   * Alquiler de silla (ETAPA 4): fallo cerrado por ROL
+   * (resolverPermisoAlquiler) — si el rol de quien consulta es ALQUILER,
+   * se ignora el empleadoId del query y se fuerza al suyo — nunca ve
+   * deudas de otro inquilino, ni aunque su modeloPago esté mal
+   * configurado. Sin empleado vinculado, ninguna deuda. El dueño/admin
+   * sigue viendo las de todos.
    */
   async listarDeudas(query: ListarDeudasFiltro) {
-    const inquilino = await this.inquilinoSvc.resolverInquilino();
-    const empleadoId = inquilino.esInquilino
-      ? inquilino.empleadoId!
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (permisoAlquiler.restringido && !permisoAlquiler.empleadoId) {
+      return [];
+    }
+    const empleadoId = permisoAlquiler.restringido
+      ? permisoAlquiler.empleadoId!
       : query.empleadoId;
 
     // Aislamiento por sucursal: un ADMIN asignado a una sucursal solo ve las
@@ -115,8 +121,13 @@ export class AlquilerService {
     });
     if (!deuda) throw new NotFoundException('Deuda no encontrada');
 
-    const inquilino = await this.inquilinoSvc.resolverInquilino();
-    if (inquilino.esInquilino && deuda.empleadoId !== inquilino.empleadoId) {
+    // Fallo cerrado por rol (ver listarDeudas): sin empleado vinculado,
+    // deuda.empleadoId !== null siempre es true, así que también cae acá.
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (
+      permisoAlquiler.restringido &&
+      deuda.empleadoId !== permisoAlquiler.empleadoId
+    ) {
       throw new NotFoundException('Deuda no encontrada');
     }
     return deuda;
