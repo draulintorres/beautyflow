@@ -22,6 +22,7 @@ import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
 import { LimitsService } from '../superadmin/limits.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { EmailService } from '../../core/email/email.service';
+import { InquilinoService } from '../../core/auth/inquilino.service';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
@@ -44,9 +45,33 @@ export class EmpleadosService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly config: ConfigService,
+    private readonly inquilinoSvc: InquilinoService,
   ) {
     this.frontendUrl = this.config.getOrThrow('FRONTEND_URL').replace(/\/+$/, '');
   }
+
+  /**
+   * Corrección (ETAPA 7): select reducido para un rol ALQUILER — solo lo
+   * que su propio frontend lee de sí mismo (confirmado archivo por
+   * archivo: AgendaPage.tsx, AgendaMobile.tsx, NuevaCitaMobile.tsx,
+   * PosPage.tsx). `activo`/`participaAgenda` se agregan aunque no se
+   * pidieron explícitamente: AgendaPage.tsx:285 filtra
+   * `e.activo && e.participaAgenda !== false` ANTES de acotar a "solo
+   * yo" — sin esos dos campos, su propia columna de agenda desaparece
+   * del todo en un día sin citas. Nunca incluye sueldoMonto, email ni
+   * el rol de acceso de nadie.
+   */
+  private readonly SELECT_ALQUILER_PROPIO = {
+    id: true,
+    nombre: true,
+    puesto: true,
+    activo: true,
+    participaAgenda: true,
+    esCuentaDueno: true,
+    modeloPago: true,
+    alquilerConfig: { select: { activo: true } },
+    usuario: { select: { id: true } },
+  } as const;
 
   // ---------- CRUD ----------
   async findAll() {
@@ -54,6 +79,19 @@ export class EmpleadosService {
     // solo ve a los empleados de esa sucursal (afecta Equipo, POS, Agenda y
     // Reportes, que comparten este endpoint).
     const suc = await this.sucursalScope.whereSucursal();
+
+    // Corrección (ETAPA 7): fallo cerrado por ROL — un rol ALQUILER solo
+    // ve su propio registro, nunca el de nadie más, ni aunque su
+    // modeloPago esté mal configurado. Sin empleado vinculado, ninguno.
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (permisoAlquiler.restringido) {
+      if (!permisoAlquiler.empleadoId) return [];
+      return this.prisma.db.empleado.findMany({
+        where: { id: permisoAlquiler.empleadoId, ...suc },
+        select: this.SELECT_ALQUILER_PROPIO,
+      });
+    }
+
     return this.prisma.db.empleado.findMany({
       where: { ...suc },
       include: {
@@ -78,6 +116,23 @@ export class EmpleadosService {
   }
 
   async findOne(id: string) {
+    // Corrección (ETAPA 7): mismo fallo cerrado que findAll — un rol
+    // ALQUILER que pide un id que no es el suyo recibe 404 (no revelar
+    // existencia), igual que ya hace agenda/ventas/alquiler con sus
+    // propios recursos.
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    if (permisoAlquiler.restringido) {
+      if (id !== permisoAlquiler.empleadoId) {
+        throw new NotFoundException('Empleado no encontrado');
+      }
+      const propio = await this.prisma.db.empleado.findFirst({
+        where: { id },
+        select: this.SELECT_ALQUILER_PROPIO,
+      });
+      if (!propio) throw new NotFoundException('Empleado no encontrado');
+      return propio;
+    }
+
     const empleado = await this.prisma.db.empleado.findFirst({
       where: { id },
       include: {
