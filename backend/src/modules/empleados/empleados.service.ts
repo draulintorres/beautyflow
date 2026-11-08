@@ -23,6 +23,7 @@ import { LimitsService } from '../superadmin/limits.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { EmailService } from '../../core/email/email.service';
 import { InquilinoService } from '../../core/auth/inquilino.service';
+import { puedeVerModulo } from '../../core/auth/permisos.matrix';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
@@ -51,17 +52,22 @@ export class EmpleadosService {
   }
 
   /**
-   * Corrección (ETAPA 7): select reducido para un rol ALQUILER — solo lo
-   * que su propio frontend lee de sí mismo (confirmado archivo por
-   * archivo: AgendaPage.tsx, AgendaMobile.tsx, NuevaCitaMobile.tsx,
-   * PosPage.tsx). `activo`/`participaAgenda` se agregan aunque no se
-   * pidieron explícitamente: AgendaPage.tsx:285 filtra
-   * `e.activo && e.participaAgenda !== false` ANTES de acotar a "solo
-   * yo" — sin esos dos campos, su propia columna de agenda desaparece
-   * del todo en un día sin citas. Nunca incluye sueldoMonto, email ni
-   * el rol de acceso de nadie.
+   * Select reducido — nunca sueldoMonto, email ni rol de acceso de
+   * nadie. Dos usos distintos (ver findAll/findOne):
+   *   - Rol ALQUILER (ETAPA 7): acotado a su propio id únicamente.
+   *   - Cualquier otro rol SIN el módulo 'equipo' (ETAPA 8): mismo
+   *     select, pero sobre TODO el personal (sí necesitan ver nombres
+   *     de compañeros para agenda/POS, solo no sus datos de acceso).
+   * Campos confirmados archivo por archivo en el frontend
+   * (AgendaPage.tsx, AgendaMobile.tsx, NuevaCitaMobile.tsx,
+   * PosPage.tsx, PosMobile.tsx). `activo`/`participaAgenda` se
+   * incluyen aunque ninguna pantalla no-gestora los pidió
+   * explícitamente: AgendaPage.tsx:285 filtra
+   * `e.activo && e.participaAgenda !== false` ANTES de acotar nada —
+   * sin esos dos campos, la columna de agenda de ese empleado
+   * desaparece del todo en un día sin citas.
    */
-  private readonly SELECT_ALQUILER_PROPIO = {
+  private readonly SELECT_PERSONAL_BASICO = {
     id: true,
     nombre: true,
     puesto: true,
@@ -80,18 +86,35 @@ export class EmpleadosService {
     // Reportes, que comparten este endpoint).
     const suc = await this.sucursalScope.whereSucursal();
 
-    // Corrección (ETAPA 7): fallo cerrado por ROL — un rol ALQUILER solo
+    // 1) Corrección (ETAPA 7): fallo cerrado por ROL — un rol ALQUILER solo
     // ve su propio registro, nunca el de nadie más, ni aunque su
     // modeloPago esté mal configurado. Sin empleado vinculado, ninguno.
+    // SIEMPRE primero: un ALQUILER nunca debe caer en la rama de abajo
+    // (vería a todo el personal en vez de solo a sí mismo).
     const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
     if (permisoAlquiler.restringido) {
       if (!permisoAlquiler.empleadoId) return [];
       return this.prisma.db.empleado.findMany({
         where: { id: permisoAlquiler.empleadoId, ...suc },
-        select: this.SELECT_ALQUILER_PROPIO,
+        select: this.SELECT_PERSONAL_BASICO,
       });
     }
 
+    // 2) Corrección (ETAPA 8): cualquier otro rol SIN el módulo 'equipo'
+    // (BARBERO, CASHIER, RECEPCION, etc.) ve a TODO el personal — lo
+    // necesitan para agenda/POS — pero con el select reducido: sin
+    // sueldoMonto, email ni rol de acceso de nadie. `puedeVerModulo` usa
+    // MATRIZ, la misma fuente que ModulosGuard — verificado en vivo que
+    // Rol.permisos (columna JSON por fila, sin uso real) no cambia esto.
+    if (!puedeVerModulo(getCurrentUser().rol as RoleKey, 'equipo')) {
+      return this.prisma.db.empleado.findMany({
+        where: { ...suc },
+        select: this.SELECT_PERSONAL_BASICO,
+        orderBy: { nombre: 'asc' },
+      });
+    }
+
+    // 3) OWNER/ADMIN/MANAGER (tienen 'equipo'): respuesta completa, sin cambios.
     return this.prisma.db.empleado.findMany({
       where: { ...suc },
       include: {
@@ -116,10 +139,10 @@ export class EmpleadosService {
   }
 
   async findOne(id: string) {
-    // Corrección (ETAPA 7): mismo fallo cerrado que findAll — un rol
+    // 1) Corrección (ETAPA 7): mismo fallo cerrado que findAll — un rol
     // ALQUILER que pide un id que no es el suyo recibe 404 (no revelar
     // existencia), igual que ya hace agenda/ventas/alquiler con sus
-    // propios recursos.
+    // propios recursos. Primero siempre, por la misma razón que arriba.
     const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
     if (permisoAlquiler.restringido) {
       if (id !== permisoAlquiler.empleadoId) {
@@ -127,12 +150,24 @@ export class EmpleadosService {
       }
       const propio = await this.prisma.db.empleado.findFirst({
         where: { id },
-        select: this.SELECT_ALQUILER_PROPIO,
+        select: this.SELECT_PERSONAL_BASICO,
       });
       if (!propio) throw new NotFoundException('Empleado no encontrado');
       return propio;
     }
 
+    // 2) Corrección (ETAPA 8): rol sin 'equipo' — cualquier id (no solo el
+    // propio), pero con el select reducido.
+    if (!puedeVerModulo(getCurrentUser().rol as RoleKey, 'equipo')) {
+      const basico = await this.prisma.db.empleado.findFirst({
+        where: { id },
+        select: this.SELECT_PERSONAL_BASICO,
+      });
+      if (!basico) throw new NotFoundException('Empleado no encontrado');
+      return basico;
+    }
+
+    // 3) OWNER/ADMIN/MANAGER: respuesta completa, sin cambios.
     const empleado = await this.prisma.db.empleado.findFirst({
       where: { id },
       include: {
