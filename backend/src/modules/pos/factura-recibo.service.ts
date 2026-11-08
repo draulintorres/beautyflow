@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
+import { InquilinoService } from '../../core/auth/inquilino.service';
 
 // Brand constants (same as ExportService)
 const C_DARK    = '#0a0a0b';
@@ -33,7 +34,29 @@ export class FacturaReciboService {
     return undefined;
   })();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inquilinoSvc: InquilinoService,
+  ) {}
+
+  /**
+   * Corrección (ETAPA 7): mismo chequeo de propiedad que
+   * ventas.service.ts#findOne, que estos dos métodos no tenían —
+   * consultaban la venta directo por id sin pasar por InquilinoService,
+   * así que un rol ALQUILER podía descargar el PDF de cualquier venta
+   * del salón si conocía/adivinaba su id. Se verifica contra las
+   * LÍNEAS de la venta (nunca contra el pago), igual en ambos métodos.
+   */
+  private assertVentaPropiaSiAlquiler(
+    permisoAlquiler: { restringido: boolean; empleadoId: string | null },
+    venta: { detalles: { empleadoId: string | null }[] },
+  ) {
+    if (!permisoAlquiler.restringido) return;
+    const esSuya =
+      !!permisoAlquiler.empleadoId &&
+      venta.detalles.some((d) => d.empleadoId === permisoAlquiler.empleadoId);
+    if (!esSuya) throw new NotFoundException('Venta no encontrada');
+  }
 
   async generateVentaRecibo(ventaId: string): Promise<Buffer> {
     const empresaId = getEmpresaId();
@@ -55,6 +78,8 @@ export class FacturaReciboService {
       }),
     ]);
     if (!venta) throw new NotFoundException('Venta no encontrada');
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    this.assertVentaPropiaSiAlquiler(permisoAlquiler, venta);
     return this.buildVentaPdf(venta, empresa);
   }
 
@@ -65,6 +90,10 @@ export class FacturaReciboService {
         where: { id: ventaId },
         include: {
           cliente: { select: { id: true, nombre: true, telefono: true, whatsapp: true } },
+          // detalles: la propiedad del inquilino se verifica a traves de la
+          // VENTA (sus lineas), nunca del pago en si — Pago no tiene
+          // empleadoId propio.
+          detalles: { select: { empleadoId: true } },
           pagos: {
             where: { id: pagoId },
             include: { metodoPago: { select: { nombre: true } } },
@@ -77,6 +106,8 @@ export class FacturaReciboService {
       }),
     ]);
     if (!venta) throw new NotFoundException('Venta no encontrada');
+    const permisoAlquiler = await this.inquilinoSvc.resolverPermisoAlquiler();
+    this.assertVentaPropiaSiAlquiler(permisoAlquiler, venta);
     const pago = venta.pagos[0];
     if (!pago) throw new NotFoundException('Pago no encontrado');
     return this.buildAbonoPdf(venta, pago, empresa);
