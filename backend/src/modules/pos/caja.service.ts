@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import {
@@ -13,7 +14,7 @@ import {
 import { getCurrentUser } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
 import { AuditService } from '../../core/audit/audit.service';
-import { CajaStatus, VentaStatus, ModeloPago, FlujoDineroAlquiler, LineaTipo } from '@prisma/client';
+import { CajaStatus, VentaStatus, ModeloPago, FlujoDineroAlquiler, LineaTipo, RoleKey } from '@prisma/client';
 
 @Injectable()
 export class CajaService {
@@ -226,8 +227,26 @@ export class CajaService {
     };
   }
 
-  /** Estado actual de una sesión abierta (resumen en vivo). */
+  /**
+   * Estado actual de una sesión abierta (resumen en vivo).
+   *
+   * Corrección (ETAPA 7): deny explícito por ROL, NO una lista blanca —
+   * devuelve totalFacturado/totalFiao de TODA la sesión de caja (dinero
+   * del salón completo, no solo del que consulta), así que un rol
+   * ALQUILER no debe verlo aunque el módulo 'pos' se lo abra. A
+   * propósito no se usa @Roles(...) acá: eso exigiría enumerar a mano
+   * todos los roles que SÍ deben seguir viéndolo (OWNER/ADMIN/MANAGER/
+   * CASHIER hoy, según permisos.matrix.ts) y arriesgarse a dejar fuera
+   * a alguno sin querer. Verificado que `estado()` y `findAll()` (que
+   * el checkout del propio inquilino sí necesita) no devuelven montos
+   * y no se tocan.
+   */
   async resumen(aperturaId: string) {
+    if (getCurrentUser().rol === RoleKey.ALQUILER) {
+      throw new ForbiddenException(
+        'No tienes acceso al resumen de esta caja.',
+      );
+    }
     const apertura = await this.prisma.db.aperturaCaja.findFirst({
       where: { id: aperturaId },
     });
