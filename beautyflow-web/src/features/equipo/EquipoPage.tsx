@@ -1002,7 +1002,7 @@ function ComisionTab({
 
 // ── IntegranteDrawer ───────────────────────────────────────
 function IntegranteDrawer({
-  data, initialTab = 'datos', sucursales, servicios, onClose, onSuccess,
+  data, initialTab = 'datos', sucursales, servicios, onClose, onSuccess, onToast,
 }: {
   data?: Integrante;
   initialTab?: Tab;
@@ -1010,6 +1010,11 @@ function IntegranteDrawer({
   servicios: Servicio[];
   onClose: () => void;
   onSuccess: () => void;
+  /** Mismo useToast() del padre (EquipoPage) -- se reutiliza en vez de
+   *  crear un sistema de avisos nuevo. Guardar en Horarios/Especialidades
+   *  no cierra el drawer (a diferencia de la pestaña Datos), así que
+   *  necesita avisar sin depender de onSuccess/onClose. */
+  onToast: (msg: string, ok?: boolean) => void;
 }) {
   const isEdit = !!data;
   const qc = useQueryClient();
@@ -1106,6 +1111,7 @@ function IntegranteDrawer({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['equipo-detalle', savedId] });
       setHorariosErr('');
+      onToast('Horarios guardados.');
     },
     onError: (e) => setHorariosErr(errMsg(e)),
   });
@@ -1116,6 +1122,7 @@ function IntegranteDrawer({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['equipo-detalle', savedId] });
       setEspErr('');
+      onToast('Especialidades guardadas.');
     },
     onError: (e) => setEspErr(errMsg(e)),
   });
@@ -2035,6 +2042,7 @@ export function EquipoPage() {
           sucursales={sucursales}
           servicios={servicios}
           onClose={() => setDrawerTarget(null)}
+          onToast={showToast}
           onSuccess={() => {
             showToast(drawerTarget.data === 'new' ? 'Integrante creado.' : 'Integrante actualizado.');
             setDrawerTarget(null);
