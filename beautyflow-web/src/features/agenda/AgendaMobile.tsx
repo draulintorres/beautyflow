@@ -138,11 +138,22 @@ export function AgendaMobile() {
   const cambiarEstado = useMutation({
     mutationFn: ({ id, estado }: { id: string; estado: string }) =>
       api.patch(`/citas/${id}/estado`, { estado }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['agenda-mobile'] }); setSel(null); },
+    // ['disponibilidad'] por prefijo: invalida TODAS las fechas/empleados en
+    // caché (NuevaCitaMobile.tsx), no solo la de hoy. Necesario porque
+    // SCHEDULED/CONFIRMED/IN_PROGRESS no liberan la hora, pero NO_ASISTIO sí.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agenda-mobile'] });
+      qc.invalidateQueries({ queryKey: ['disponibilidad'] });
+      setSel(null);
+    },
   });
   const cancelar = useMutation({
     mutationFn: (id: string) => api.patch(`/citas/${id}/cancelar`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['agenda-mobile'] }); setSel(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agenda-mobile'] });
+      qc.invalidateQueries({ queryKey: ['disponibilidad'] });
+      setSel(null);
+    },
   });
 
   return (
@@ -402,6 +413,7 @@ export function AgendaMobile() {
             setReprog(false);
             setSel(null);
             qc.invalidateQueries({ queryKey: ['agenda-mobile'] });
+            qc.invalidateQueries({ queryKey: ['disponibilidad'] });
           }}
         />
       )}
@@ -418,6 +430,7 @@ export function AgendaMobile() {
             setFinalizandoSinCobro(false);
             setSel(null);
             qc.invalidateQueries({ queryKey: ['agenda-mobile'] });
+            qc.invalidateQueries({ queryKey: ['disponibilidad'] });
           }}
         />
       )}
