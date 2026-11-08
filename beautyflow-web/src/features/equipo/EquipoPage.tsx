@@ -89,6 +89,18 @@ function avatarBg(nombre: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
+// Mismo formato 12h que ya usa Agenda (AgendaPage.tsx#labelTime12,
+// AgendaMobile.tsx#toAmPm) -- no se pudo importar sin exportar esas
+// funciones desde un archivo de otra feature, así que se duplica aquí
+// a propósito (misma fórmula). Solo cambia el TEXTO mostrado -- el
+// valor guardado sigue en HH:mm 24h, sin tocar.
+function hhmmToAmPm(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const period = h < 12 ? 'AM' : 'PM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
 const errMsg = (e: unknown) => {
   const msg = (e as any)?.response?.data?.message;
   if (msg) return Array.isArray(msg) ? msg.join(' · ') : String(msg);
@@ -1256,7 +1268,7 @@ function IntegranteDrawer({
               ) : (
                 <>
                   <p className={styles.espHint}>
-                    Dejamos un horario inicial de 8:00 a. m. a 10:00 p. m., de lunes a domingo.
+                    Dejamos un horario inicial de {hhmmToAmPm('08:00')} a {hhmmToAmPm('22:00')}, de lunes a domingo.
                     Ajústalo a lo que realmente trabaja este empleado y guarda los cambios.
                   </p>
                   <div className={styles.horariosGrid}>
@@ -1283,7 +1295,7 @@ function IntegranteDrawer({
                     ))}
                   </div>
                   <button type="button" className={styles.btnApplyLV} onClick={aplicarLV}>
-                    Aplicar 09:00–18:00 a Lun–Vie
+                    Aplicar {hhmmToAmPm('09:00')}–{hhmmToAmPm('18:00')} a Lun–Vie
                   </button>
                   {horariosErr && <p className={styles.modalErr}>{horariosErr}</p>}
                 </>
