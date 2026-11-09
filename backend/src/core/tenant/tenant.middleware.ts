@@ -46,6 +46,7 @@ export class TenantMiddleware implements NestMiddleware {
       empresaId: payload.empresaId,
       usuarioId: payload.sub,
       rol: payload.rol,
+      tipo: payload.tipo,
     };
 
     // Adjuntar al request para guards/decoradores y propagar por contexto

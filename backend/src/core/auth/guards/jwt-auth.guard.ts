@@ -8,8 +8,13 @@ import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/auth.decorators';
 
 /**
- * Exige un usuario autenticado en el request (resuelto por TenantMiddleware),
- * salvo en rutas marcadas con @Public().
+ * Exige un usuario de personal autenticado en el request (resuelto por
+ * TenantMiddleware), salvo en rutas marcadas con @Public(). Rechaza
+ * explícitamente los tokens de portal (tipo==='portal'): esos solo deben
+ * dar acceso a /portal/*, que valida con su propio PortalAuthGuard y está
+ * marcado @Public() a nivel de este guard -- sin este chequeo, un token de
+ * portal (firmado con el mismo secret que el de personal) podía pasar
+ * JwtAuthGuard en cualquier ruta de personal sin @Roles()/@Modulos().
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -23,7 +28,7 @@ export class JwtAuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = ctx.switchToHttp().getRequest();
-    if (!request.user?.usuarioId) {
+    if (!request.user?.usuarioId || request.user?.tipo === 'portal') {
       throw new UnauthorizedException('Autenticación requerida');
     }
     return true;
