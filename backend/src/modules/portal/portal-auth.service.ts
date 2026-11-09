@@ -14,18 +14,40 @@ import {
 } from './dto/portal.dto';
 import { NotificacionEvento, CanalNotificacion, EmpresaStatus } from '@prisma/client';
 import { createHash, randomInt, randomBytes } from 'crypto';
+import { RateLimiterService } from '../../core/common/rate-limiter.service';
+import { TooManyRequestsException } from '../../core/common/too-many-requests.exception';
 
 @Injectable()
 export class PortalAuthService {
+  // Llave IP + destino: cuenta toda solicitud (exista o no el cliente),
+  // igual que el tope de forgot-password.
+  private static readonly OTP_MAX_PER_HOUR = 5;
+  private static readonly OTP_WINDOW_MS = 60 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly notif: NotificationService,
+    private readonly rateLimiter: RateLimiterService,
   ) {}
 
   // ---------- SOLICITAR OTP ----------
-  async solicitarOtp(dto: SolicitarOtpDto) {
+  async solicitarOtp(dto: SolicitarOtpDto, ip: string) {
+    const rlKey = `otp:${ip}|${dto.destino}`;
+    const check = this.rateLimiter.estaBloqueado(
+      rlKey,
+      PortalAuthService.OTP_MAX_PER_HOUR,
+      PortalAuthService.OTP_WINDOW_MS,
+    );
+    if (!check.allowed) {
+      throw new TooManyRequestsException(
+        check.retryAfterSeconds,
+        `Demasiados intentos. Intenta de nuevo en ${Math.ceil(check.retryAfterSeconds / 60)} minutos.`,
+      );
+    }
+    this.rateLimiter.registrarFallo(rlKey, PortalAuthService.OTP_WINDOW_MS);
+
     const empresa = await this.resolverEmpresa(dto.empresaSlug);
 
     // Buscar cliente por teléfono, whatsapp o email dentro de la empresa
