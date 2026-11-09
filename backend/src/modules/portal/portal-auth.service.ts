@@ -30,6 +30,13 @@ export class PortalAuthService {
   // Cuenta solo "código incorrecto" (no "inválido o expirado" ni "ya sin
   // intentos", que no dependen de lo que la persona escribió). Esto es
   // ADEMÁS del tope de 5 intentos por código que ya existía.
+  //
+  // A propósito, un código CORRECTO NO reinicia este contador (a
+  // diferencia de login/admin-login/forgot-password): quien tenga un
+  // contacto propio (su propio teléfono o correo) podría acertar su
+  // propio código para resetear el contador por IP y seguir probando
+  // códigos contra OTROS destinos desde la misma IP sin límite real. El
+  // tope por IP debe expirar únicamente al terminar su ventana de 1 hora.
   private static readonly VERIFY_OTP_MAX_PER_HOUR = 30;
   private static readonly VERIFY_OTP_WINDOW_MS = 60 * 60 * 1000;
 
@@ -160,7 +167,8 @@ export class PortalAuthService {
       throw new UnauthorizedException('No existe un cliente con ese contacto');
     }
 
-    this.rateLimiter.reset(rlKey);
+    // A propósito, NO se llama a this.rateLimiter.reset(rlKey) aquí: ver
+    // comentario de VERIFY_OTP_MAX_PER_HOUR más arriba.
 
     // Marcar OTP como usado
     await this.prisma.clienteOtp.update({
