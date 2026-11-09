@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { TooManyRequestsException } from '../too-many-requests.exception';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -32,6 +33,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `${request.method} ${request.url}`,
         (exception as Error)?.stack,
       );
+    }
+
+    if (exception instanceof TooManyRequestsException) {
+      response.set('Retry-After', String(exception.retryAfterSeconds));
     }
 
     response.status(status).json({

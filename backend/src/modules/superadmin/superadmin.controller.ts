@@ -11,7 +11,9 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { SuperAdminService } from './superadmin.service';
 import { SuperAdminBillingService } from './superadmin-billing.service';
 import {
@@ -41,8 +43,8 @@ export class SuperAdminController {
   @SaPublic()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: SuperAdminLoginDto) {
-    return this.sa.login(dto);
+  login(@Body() dto: SuperAdminLoginDto, @Req() req: Request) {
+    return this.sa.login(dto, req.ip ?? 'desconocida');
   }
 
   // ---------- DASHBOARD ----------

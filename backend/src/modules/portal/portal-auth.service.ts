@@ -14,18 +14,56 @@ import {
 } from './dto/portal.dto';
 import { NotificacionEvento, CanalNotificacion, EmpresaStatus } from '@prisma/client';
 import { createHash, randomInt, randomBytes } from 'crypto';
+import { RateLimiterService } from '../../core/common/rate-limiter.service';
+import { TooManyRequestsException } from '../../core/common/too-many-requests.exception';
+import { normalizarIp } from '../../core/common/normalizar-ip.util';
 
 @Injectable()
 export class PortalAuthService {
+  // Llave IP + destino: cuenta toda solicitud (exista o no el cliente),
+  // igual que el tope de forgot-password.
+  private static readonly OTP_MAX_PER_HOUR = 5;
+  private static readonly OTP_WINDOW_MS = 60 * 60 * 1000;
+
+  // verificar-otp: llave SOLO por IP (no por destino) -- frena a alguien
+  // probando códigos contra muchos destinos distintos desde la misma IP.
+  // Cuenta solo "código incorrecto" (no "inválido o expirado" ni "ya sin
+  // intentos", que no dependen de lo que la persona escribió). Esto es
+  // ADEMÁS del tope de 5 intentos por código que ya existía.
+  //
+  // A propósito, un código CORRECTO NO reinicia este contador (a
+  // diferencia de login/admin-login/forgot-password): quien tenga un
+  // contacto propio (su propio teléfono o correo) podría acertar su
+  // propio código para resetear el contador por IP y seguir probando
+  // códigos contra OTROS destinos desde la misma IP sin límite real. El
+  // tope por IP debe expirar únicamente al terminar su ventana de 1 hora.
+  private static readonly VERIFY_OTP_MAX_PER_HOUR = 30;
+  private static readonly VERIFY_OTP_WINDOW_MS = 60 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly notif: NotificationService,
+    private readonly rateLimiter: RateLimiterService,
   ) {}
 
   // ---------- SOLICITAR OTP ----------
-  async solicitarOtp(dto: SolicitarOtpDto) {
+  async solicitarOtp(dto: SolicitarOtpDto, ip: string) {
+    const rlKey = `otp:${normalizarIp(ip)}|${dto.destino}`;
+    const check = this.rateLimiter.estaBloqueado(
+      rlKey,
+      PortalAuthService.OTP_MAX_PER_HOUR,
+      PortalAuthService.OTP_WINDOW_MS,
+    );
+    if (!check.allowed) {
+      throw new TooManyRequestsException(
+        check.retryAfterSeconds,
+        `Demasiados intentos. Intenta de nuevo en ${Math.ceil(check.retryAfterSeconds / 60)} minutos.`,
+      );
+    }
+    this.rateLimiter.registrarFallo(rlKey, PortalAuthService.OTP_WINDOW_MS);
+
     const empresa = await this.resolverEmpresa(dto.empresaSlug);
 
     // Buscar cliente por teléfono, whatsapp o email dentro de la empresa
@@ -84,7 +122,21 @@ export class PortalAuthService {
   }
 
   // ---------- VERIFICAR OTP ----------
-  async verificarOtp(dto: VerificarOtpDto) {
+  async verificarOtp(dto: VerificarOtpDto, ip: string) {
+    const rlKey = `verify-otp:${normalizarIp(ip)}`;
+
+    const check = this.rateLimiter.estaBloqueado(
+      rlKey,
+      PortalAuthService.VERIFY_OTP_MAX_PER_HOUR,
+      PortalAuthService.VERIFY_OTP_WINDOW_MS,
+    );
+    if (!check.allowed) {
+      throw new TooManyRequestsException(
+        check.retryAfterSeconds,
+        `Demasiados intentos. Intenta de nuevo en ${Math.ceil(check.retryAfterSeconds / 60)} minutos.`,
+      );
+    }
+
     const empresa = await this.resolverEmpresa(dto.empresaSlug);
 
     const otp = await this.prisma.clienteOtp.findFirst({
@@ -108,11 +160,15 @@ export class PortalAuthService {
         where: { id: otp.id },
         data: { intentos: { increment: 1 } },
       });
+      this.rateLimiter.registrarFallo(rlKey, PortalAuthService.VERIFY_OTP_WINDOW_MS);
       throw new UnauthorizedException('Código incorrecto');
     }
     if (!otp.clienteId) {
       throw new UnauthorizedException('No existe un cliente con ese contacto');
     }
+
+    // A propósito, NO se llama a this.rateLimiter.reset(rlKey) aquí: ver
+    // comentario de VERIFY_OTP_MAX_PER_HOUR más arriba.
 
     // Marcar OTP como usado
     await this.prisma.clienteOtp.update({

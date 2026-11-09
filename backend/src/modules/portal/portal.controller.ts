@@ -11,7 +11,9 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { PortalAuthService } from './portal-auth.service';
 import { PortalService } from './portal.service';
 import {
@@ -49,15 +51,15 @@ export class PortalController {
   @PortalPublic()
   @Post('auth/solicitar-otp')
   @HttpCode(HttpStatus.OK)
-  solicitarOtp(@Body() dto: SolicitarOtpDto) {
-    return this.auth.solicitarOtp(dto);
+  solicitarOtp(@Body() dto: SolicitarOtpDto, @Req() req: Request) {
+    return this.auth.solicitarOtp(dto, req.ip ?? 'desconocida');
   }
 
   @PortalPublic()
   @Post('auth/verificar-otp')
   @HttpCode(HttpStatus.OK)
-  verificarOtp(@Body() dto: VerificarOtpDto) {
-    return this.auth.verificarOtp(dto);
+  verificarOtp(@Body() dto: VerificarOtpDto, @Req() req: Request) {
+    return this.auth.verificarOtp(dto, req.ip ?? 'desconocida');
   }
 
   @PortalPublic()
