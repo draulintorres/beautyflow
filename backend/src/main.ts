@@ -7,9 +7,14 @@ import { AllExceptionsFilter } from './core/common/filters/all-exceptions.filter
 import { resolveTrustProxyHops } from './core/common/trust-proxy.util';
 
 async function bootstrap() {
+  // Se valida ANTES de crear la app (que ya conecta a la base de datos en
+  // su propio onModuleInit): un TRUST_PROXY_HOPS inválido debe tumbar el
+  // arranque sin depender de que la base esté disponible.
+  const trustProxyHops = resolveTrustProxyHops();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  app.set('trust proxy', resolveTrustProxyHops());
+  app.set('trust proxy', trustProxyHops);
 
   app.use(helmet());
   app.enableCors({
