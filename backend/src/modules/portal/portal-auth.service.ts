@@ -16,6 +16,7 @@ import { NotificacionEvento, CanalNotificacion, EmpresaStatus } from '@prisma/cl
 import { createHash, randomInt, randomBytes } from 'crypto';
 import { RateLimiterService } from '../../core/common/rate-limiter.service';
 import { TooManyRequestsException } from '../../core/common/too-many-requests.exception';
+import { normalizarIp } from '../../core/common/normalizar-ip.util';
 
 @Injectable()
 export class PortalAuthService {
@@ -34,7 +35,7 @@ export class PortalAuthService {
 
   // ---------- SOLICITAR OTP ----------
   async solicitarOtp(dto: SolicitarOtpDto, ip: string) {
-    const rlKey = `otp:${ip}|${dto.destino}`;
+    const rlKey = `otp:${normalizarIp(ip)}|${dto.destino}`;
     const check = this.rateLimiter.estaBloqueado(
       rlKey,
       PortalAuthService.OTP_MAX_PER_HOUR,

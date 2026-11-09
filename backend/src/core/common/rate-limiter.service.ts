@@ -91,13 +91,20 @@ export class RateLimiterService {
   registrarFallo(rawKey: string, windowMs: number): void {
     const key = this.normalizeKey(rawKey);
     const now = this.clock();
-    this.limpiarVencidas(now);
+    this.limpiarVencidasSiToca(now);
 
-    let entry = this.buckets.get(key);
-    if (!entry || now - entry.windowStart >= entry.windowMs) {
-      entry = { count: 0, windowStart: now, windowMs };
-    }
+    const existente = this.buckets.get(key);
+    const entry: Entry =
+      !existente || now - existente.windowStart >= existente.windowMs
+        ? { count: 0, windowStart: now, windowMs }
+        : existente;
     entry.count += 1;
+
+    // Borrar y volver a insertar mueve la llave al final del orden de
+    // inserción del Map — así la PRIMERA llave al iterar es siempre la
+    // menos usada recientemente, y aplicarTope() puede descartarla sin
+    // ordenar ni recorrer el resto (O(1) en vez de O(n log n)).
+    this.buckets.delete(key);
     this.buckets.set(key, entry);
 
     this.aplicarTope();
@@ -113,7 +120,22 @@ export class RateLimiterService {
     return this.buckets.size;
   }
 
-  private limpiarVencidas(now: number): void {
+  private static readonly SWEEP_INTERVAL_MS = 30_000;
+  private lastSweep = 0;
+
+  /** Barrido completo del mapa, como máximo cada SWEEP_INTERVAL_MS — NO en
+   * cada fallo. Recorrer todo el mapa en cada llamada era O(n) por
+   * intento (O(n²) al llenar n llaves), el costo real detrás de la
+   * lentitud original con 10.000+ llaves. La corrección por llave sigue
+   * siendo inmediata e independiente de este barrido: estaBloqueado() y
+   * registrarFallo() ya comparan `now - entry.windowStart` contra
+   * `entry.windowMs` en cada acceso, así que una llave vencida nunca
+   * bloquea ni sigue contando mal aunque el barrido global todavía no la
+   * haya sacado del mapa — este barrido solo libera memoria de llaves que
+   * nadie volvió a tocar. */
+  private limpiarVencidasSiToca(now: number): void {
+    if (now - this.lastSweep < RateLimiterService.SWEEP_INTERVAL_MS) return;
+    this.lastSweep = now;
     for (const [key, entry] of this.buckets) {
       if (now - entry.windowStart >= entry.windowMs) {
         this.buckets.delete(key);
@@ -121,18 +143,14 @@ export class RateLimiterService {
     }
   }
 
-  /** Si se llena (ej. una ráfaga de IPs distintas), descarta las entradas
-   * más viejas por windowStart hasta volver al tope — nunca crece sin
-   * límite en memoria. */
+  /** Si se llena, descarta la entrada menos usada recientemente (la
+   * primera en el orden de inserción del Map) hasta volver al tope — O(1)
+   * por descarte, sin ordenar ni recorrer el resto del mapa. */
   private aplicarTope(): void {
-    const exceso = this.buckets.size - RateLimiterService.MAX_ENTRIES;
-    if (exceso <= 0) return;
-
-    const porAntiguedad = [...this.buckets.entries()].sort(
-      (a, b) => a[1].windowStart - b[1].windowStart,
-    );
-    for (let i = 0; i < exceso; i++) {
-      this.buckets.delete(porAntiguedad[i][0]);
+    while (this.buckets.size > RateLimiterService.MAX_ENTRIES) {
+      const masVieja = this.buckets.keys().next().value;
+      if (masVieja === undefined) break;
+      this.buckets.delete(masVieja);
     }
   }
 }

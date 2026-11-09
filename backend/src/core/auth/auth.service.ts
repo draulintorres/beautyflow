@@ -14,6 +14,7 @@ import { ModulosEfectivosService } from '../../modules/superadmin/modulos-efecti
 import { EmailService } from '../email/email.service';
 import { RateLimiterService } from '../common/rate-limiter.service';
 import { TooManyRequestsException } from '../common/too-many-requests.exception';
+import { normalizarIp } from '../common/normalizar-ip.util';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -112,7 +113,7 @@ export class AuthService {
 
   // ---------- LOGIN ----------
   async login(empresaSlug: string, email: string, password: string, ip: string) {
-    const rlKey = `login:${ip}|${empresaSlug}|${email}`;
+    const rlKey = `login:${normalizarIp(ip)}|${empresaSlug}|${email}`;
 
     // Se consulta ANTES de tocar la base o bcrypt: si ya está bloqueada,
     // la ruta responde 429 sin hacer ese trabajo.
@@ -208,7 +209,7 @@ export class AuthService {
 
   // ---------- FORGOT PASSWORD ----------
   async forgotPassword(empresaSlug: string, email: string, ip: string) {
-    const rlKey = `forgot:${ip}`;
+    const rlKey = `forgot:${normalizarIp(ip)}`;
 
     const check = this.rateLimiter.estaBloqueado(
       rlKey,

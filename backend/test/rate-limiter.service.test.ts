@@ -62,18 +62,31 @@ test('un intento exitoso (reset) reinicia el contador', () => {
   assert.equal(svc.estaBloqueado(key, 5, windowMs).remaining, 5);
 });
 
-test('limpieza de entradas vencidas: una llave vieja se elimina del mapa al expirar', () => {
+test('limpieza de entradas vencidas: una llave vieja se elimina del mapa tras el barrido (maximo cada 30s)', () => {
   const { svc, advance } = withClock();
   const windowMs = 1000;
 
   svc.registrarFallo('vieja', windowMs);
   assert.equal(svc.size(), 1);
 
-  advance(2000); // vencida
-  // registrar un fallo de OTRA llave dispara la limpieza general
+  advance(31_000); // vencida Y ya pasaron los 30s del barrido periodico
+  // registrar un fallo de OTRA llave dispara el barrido general
   svc.registrarFallo('nueva', windowMs);
 
   assert.equal(svc.size(), 1); // "vieja" fue barrida, solo queda "nueva"
+});
+
+test('limpieza NO corre en cada fallo: antes de los 30s, una llave vencida sigue en el mapa (pero no bloquea)', () => {
+  const { svc, advance } = withClock();
+  const windowMs = 1000;
+
+  svc.registrarFallo('vieja2', windowMs);
+  advance(5000); // vencida por su propia ventana, pero faltan los 30s del barrido
+  svc.registrarFallo('nueva2', windowMs);
+
+  assert.equal(svc.size(), 2); // el barrido global todavía no corrió
+  // pero el chequeo por llave sigue siendo correcto: "vieja2" ya no bloquea
+  assert.equal(svc.estaBloqueado('vieja2', 1, windowMs).allowed, true);
 });
 
 test('tope de entradas: con más de 10.000 llaves distintas, descarta las más viejas', () => {
@@ -93,6 +106,21 @@ test('tope de entradas: con más de 10.000 llaves distintas, descarta las más v
   assert.equal(svc.estaBloqueado('llave-0', 1, windowMs).remaining, 1);
   // la más nueva sigue presente con su fallo contado
   assert.equal(svc.estaBloqueado('llave-nueva-10001', 1, windowMs).allowed, false);
+});
+
+test('rendimiento: llenar 10.000+ llaves ya no tarda ~1s (barrido no es O(n) por intento)', () => {
+  const { svc, advance } = withClock();
+  const windowMs = 60 * 60 * 1000;
+
+  const inicio = Date.now(); // tiempo real de ejecución, no el reloj simulado
+  for (let i = 0; i < 10_000; i++) {
+    svc.registrarFallo(`perf-${i}`, windowMs);
+    advance(1); // nunca llega a los 30s del barrido durante todo el llenado
+  }
+  const ms = Date.now() - inicio;
+
+  assert.equal(svc.size(), 10_000);
+  assert.ok(ms < 300, `se esperaba <300ms con el barrido gateado, tardó ${ms}ms`);
 });
 
 test('normalización de llaves: trim, minúsculas y la misma normalización de slug que el login', () => {
