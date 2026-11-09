@@ -49,6 +49,14 @@ export class AuthService {
   private static readonly LOGIN_MAX_ATTEMPTS = 5;
   private static readonly LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
+  // forgot-password: tope por IP sin importar el correo (evita spamear el
+  // endpoint / el servicio de correo), más enfriamiento por cuenta. Sin
+  // tope diario por cuenta a propósito (lo pidió así explícitamente).
+  private static readonly FORGOT_MAX_PER_HOUR = 10;
+  private static readonly FORGOT_WINDOW_MS = 60 * 60 * 1000;
+  private static readonly FORGOT_COOLDOWN_MS = 5 * 60 * 1000;
+  private static readonly FORGOT_TOKEN_TTL_MS = 60 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -199,7 +207,24 @@ export class AuthService {
   }
 
   // ---------- FORGOT PASSWORD ----------
-  async forgotPassword(empresaSlug: string, email: string) {
+  async forgotPassword(empresaSlug: string, email: string, ip: string) {
+    const rlKey = `forgot:${ip}`;
+
+    const check = this.rateLimiter.estaBloqueado(
+      rlKey,
+      AuthService.FORGOT_MAX_PER_HOUR,
+      AuthService.FORGOT_WINDOW_MS,
+    );
+    if (!check.allowed) {
+      throw new TooManyRequestsException(
+        check.retryAfterSeconds,
+        `Demasiados intentos. Intenta de nuevo en ${Math.ceil(check.retryAfterSeconds / 60)} minutos.`,
+      );
+    }
+    // Cuenta TODAS las solicitudes de esta IP, exista o no la cuenta y se
+    // reenvíe o no el correo — el tope es sobre el endpoint en sí.
+    this.rateLimiter.registrarFallo(rlKey, AuthService.FORGOT_WINDOW_MS);
+
     const empresa = await this.prisma.empresa.findUnique({
       where: { slug: empresaSlug },
     });
@@ -216,9 +241,21 @@ export class AuthService {
     });
     if (!usuario || !usuario.activo || usuario.deletedAt) return generic;
 
+    // Enfriamiento de 5 min por cuenta, calculado desde resetTokenExpires
+    // sin agregar una columna nueva: como el token siempre se emite con
+    // TTL de 1h, restarle ese TTL a resetTokenExpires da el momento en que
+    // se emitió. Si fue hace menos de 5 min, no se reenvía correo ni se
+    // pisa el token — misma respuesta genérica de siempre.
+    if (usuario.resetTokenExpires) {
+      const emitidoEn = usuario.resetTokenExpires.getTime() - AuthService.FORGOT_TOKEN_TTL_MS;
+      if (Date.now() - emitidoEn < AuthService.FORGOT_COOLDOWN_MS) {
+        return generic;
+      }
+    }
+
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    const expires = new Date(Date.now() + AuthService.FORGOT_TOKEN_TTL_MS);
 
     await this.prisma.usuario.update({
       where: { id: usuario.id },
