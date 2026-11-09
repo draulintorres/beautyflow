@@ -9,6 +9,8 @@ export interface TenantStore {
   empresaId: string;
   usuarioId: string;
   rol: string;
+  /** 'portal' si el token es de un cliente del portal; undefined para personal. */
+  tipo?: string;
 }
 
 export const tenantContext = new AsyncLocalStorage<TenantStore>();
