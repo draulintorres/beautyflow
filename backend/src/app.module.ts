@@ -9,6 +9,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 
 import { PrismaModule } from './core/prisma/prisma.module';
+import { CommonModule } from './core/common/common.module';
 import { AuthModule } from './core/auth/auth.module';
 import { AuditModule } from './core/audit/audit.module';
 import { InquilinoModule } from './core/auth/inquilino.module';
@@ -41,6 +42,7 @@ import { SuperAdminModule } from './modules/superadmin/superadmin.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    CommonModule,
     TenantModule,
     AuthModule,
     AuditModule,

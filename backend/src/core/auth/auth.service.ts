@@ -12,6 +12,8 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes, createHash } from 'crypto';
 import { ModulosEfectivosService } from '../../modules/superadmin/modulos-efectivos.service';
 import { EmailService } from '../email/email.service';
+import { RateLimiterService } from '../common/rate-limiter.service';
+import { TooManyRequestsException } from '../common/too-many-requests.exception';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -41,12 +43,19 @@ export class AuthService {
   private readonly webauthnRpName: string;
   private readonly frontendUrl: string;
 
+  // Tope de fallos de login de personal: llave IP + empresa + correo, para
+  // no bloquear a toda una empresa por los fallos de otra, ni a todos los
+  // correos por los fallos de uno solo.
+  private static readonly LOGIN_MAX_ATTEMPTS = 5;
+  private static readonly LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly modulosEfectivos: ModulosEfectivosService,
     private readonly email: EmailService,
+    private readonly rateLimiter: RateLimiterService,
   ) {
     this.accessSecret = this.config.getOrThrow('JWT_ACCESS_SECRET');
     this.refreshSecret = this.config.getOrThrow('JWT_REFRESH_SECRET');
@@ -94,9 +103,26 @@ export class AuthService {
   }
 
   // ---------- LOGIN ----------
-  async login(empresaSlug: string, email: string, password: string) {
+  async login(empresaSlug: string, email: string, password: string, ip: string) {
+    const rlKey = `login:${ip}|${empresaSlug}|${email}`;
+
+    // Se consulta ANTES de tocar la base o bcrypt: si ya está bloqueada,
+    // la ruta responde 429 sin hacer ese trabajo.
+    const check = this.rateLimiter.estaBloqueado(
+      rlKey,
+      AuthService.LOGIN_MAX_ATTEMPTS,
+      AuthService.LOGIN_WINDOW_MS,
+    );
+    if (!check.allowed) {
+      throw new TooManyRequestsException(
+        check.retryAfterSeconds,
+        `Demasiados intentos. Intenta de nuevo en ${Math.ceil(check.retryAfterSeconds / 60)} minutos.`,
+      );
+    }
+
     const empresa = await this.resolverEmpresaPorSlug(empresaSlug);
     if (!empresa || empresa.deletedAt || empresa.estado !== EmpresaStatus.ACTIVE) {
+      this.rateLimiter.registrarFallo(rlKey, AuthService.LOGIN_WINDOW_MS);
       throw new UnauthorizedException('Empresa no disponible');
     }
 
@@ -105,13 +131,17 @@ export class AuthService {
       include: { rol: true },
     });
     if (!usuario || usuario.deletedAt || !usuario.activo) {
+      this.rateLimiter.registrarFallo(rlKey, AuthService.LOGIN_WINDOW_MS);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
     const valid = await bcrypt.compare(password, usuario.passwordHash);
     if (!valid) {
+      this.rateLimiter.registrarFallo(rlKey, AuthService.LOGIN_WINDOW_MS);
       throw new UnauthorizedException('Credenciales inválidas');
     }
+
+    this.rateLimiter.reset(rlKey);
 
     await this.prisma.usuario.update({
       where: { id: usuario.id },

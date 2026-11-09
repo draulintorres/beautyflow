@@ -7,7 +7,9 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import {
   LoginDto,
@@ -30,8 +32,8 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.auth.login(dto.empresaSlug, dto.email, dto.password);
+  login(@Body() dto: LoginDto, @Req() req: Request) {
+    return this.auth.login(dto.empresaSlug, dto.email, dto.password, req.ip ?? 'desconocida');
   }
 
   @Public()

@@ -28,6 +28,8 @@ import { randomBytes } from 'crypto';
 import { ModulosEfectivosService } from './modulos-efectivos.service';
 import { MODULOS_GATEABLES, MODULOS_POR_PLAN } from '../../core/auth/permisos.matrix';
 import { EmailService } from '../../core/email/email.service';
+import { RateLimiterService } from '../../core/common/rate-limiter.service';
+import { TooManyRequestsException } from '../../core/common/too-many-requests.exception';
 
 /**
  * Servicio del Super Admin. Opera SIN contexto de tenant: usa el cliente
@@ -38,12 +40,18 @@ import { EmailService } from '../../core/email/email.service';
 export class SuperAdminService {
   private readonly frontendUrl: string;
 
+  // Tope más estricto que el login de personal: solo existe un puñado de
+  // super admins, así que 3 fallos ya es sospechoso.
+  private static readonly LOGIN_MAX_ATTEMPTS = 3;
+  private static readonly LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly modulosEfectivos: ModulosEfectivosService,
     private readonly email: EmailService,
+    private readonly rateLimiter: RateLimiterService,
   ) {
     // Sin barra final — ver mismo fix en auth.service.ts (FRONTEND_URL en
     // Render viene con una al final).
@@ -51,15 +59,35 @@ export class SuperAdminService {
   }
 
   // ============ AUTH ============
-  async login(dto: SuperAdminLoginDto) {
+  async login(dto: SuperAdminLoginDto, ip: string) {
+    const rlKey = `admin-login:${ip}|${dto.email}`;
+
+    const check = this.rateLimiter.estaBloqueado(
+      rlKey,
+      SuperAdminService.LOGIN_MAX_ATTEMPTS,
+      SuperAdminService.LOGIN_WINDOW_MS,
+    );
+    if (!check.allowed) {
+      throw new TooManyRequestsException(
+        check.retryAfterSeconds,
+        `Demasiados intentos. Intenta de nuevo en ${Math.ceil(check.retryAfterSeconds / 60)} minutos.`,
+      );
+    }
+
     const admin = await this.prisma.superAdmin.findUnique({
       where: { email: dto.email },
     });
     if (!admin || !admin.activo || admin.deletedAt) {
+      this.rateLimiter.registrarFallo(rlKey, SuperAdminService.LOGIN_WINDOW_MS);
       throw new UnauthorizedException('Credenciales inválidas');
     }
     const valido = await bcrypt.compare(dto.password, admin.passwordHash);
-    if (!valido) throw new UnauthorizedException('Credenciales inválidas');
+    if (!valido) {
+      this.rateLimiter.registrarFallo(rlKey, SuperAdminService.LOGIN_WINDOW_MS);
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    this.rateLimiter.reset(rlKey);
 
     await this.prisma.superAdmin.update({
       where: { id: admin.id },
