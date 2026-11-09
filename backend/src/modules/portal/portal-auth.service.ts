@@ -25,6 +25,14 @@ export class PortalAuthService {
   private static readonly OTP_MAX_PER_HOUR = 5;
   private static readonly OTP_WINDOW_MS = 60 * 60 * 1000;
 
+  // verificar-otp: llave SOLO por IP (no por destino) -- frena a alguien
+  // probando códigos contra muchos destinos distintos desde la misma IP.
+  // Cuenta solo "código incorrecto" (no "inválido o expirado" ni "ya sin
+  // intentos", que no dependen de lo que la persona escribió). Esto es
+  // ADEMÁS del tope de 5 intentos por código que ya existía.
+  private static readonly VERIFY_OTP_MAX_PER_HOUR = 30;
+  private static readonly VERIFY_OTP_WINDOW_MS = 60 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -107,7 +115,21 @@ export class PortalAuthService {
   }
 
   // ---------- VERIFICAR OTP ----------
-  async verificarOtp(dto: VerificarOtpDto) {
+  async verificarOtp(dto: VerificarOtpDto, ip: string) {
+    const rlKey = `verify-otp:${normalizarIp(ip)}`;
+
+    const check = this.rateLimiter.estaBloqueado(
+      rlKey,
+      PortalAuthService.VERIFY_OTP_MAX_PER_HOUR,
+      PortalAuthService.VERIFY_OTP_WINDOW_MS,
+    );
+    if (!check.allowed) {
+      throw new TooManyRequestsException(
+        check.retryAfterSeconds,
+        `Demasiados intentos. Intenta de nuevo en ${Math.ceil(check.retryAfterSeconds / 60)} minutos.`,
+      );
+    }
+
     const empresa = await this.resolverEmpresa(dto.empresaSlug);
 
     const otp = await this.prisma.clienteOtp.findFirst({
@@ -131,11 +153,14 @@ export class PortalAuthService {
         where: { id: otp.id },
         data: { intentos: { increment: 1 } },
       });
+      this.rateLimiter.registrarFallo(rlKey, PortalAuthService.VERIFY_OTP_WINDOW_MS);
       throw new UnauthorizedException('Código incorrecto');
     }
     if (!otp.clienteId) {
       throw new UnauthorizedException('No existe un cliente con ese contacto');
     }
+
+    this.rateLimiter.reset(rlKey);
 
     // Marcar OTP como usado
     await this.prisma.clienteOtp.update({

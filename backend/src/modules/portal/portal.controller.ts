@@ -58,8 +58,8 @@ export class PortalController {
   @PortalPublic()
   @Post('auth/verificar-otp')
   @HttpCode(HttpStatus.OK)
-  verificarOtp(@Body() dto: VerificarOtpDto) {
-    return this.auth.verificarOtp(dto);
+  verificarOtp(@Body() dto: VerificarOtpDto, @Req() req: Request) {
+    return this.auth.verificarOtp(dto, req.ip ?? 'desconocida');
   }
 
   @PortalPublic()
