@@ -12,6 +12,17 @@ const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
 const EMPRESA_SLUG = 'beauty-glam';
 const TIMER_SECS = 600; // 10 min — expiración real del OTP
 
+// Si el backend mandó un mensaje propio (ej. el 429 "Demasiados intentos...
+// Intenta de nuevo en X minutos."), se muestra tal cual; si no (error de
+// red, etc.), se usa el texto genérico de siempre.
+function mensajeDeError(err: unknown, generico: string): string {
+  const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
+  const msg = axiosErr?.response?.data?.message;
+  if (typeof msg === 'string') return msg;
+  if (Array.isArray(msg) && typeof msg[0] === 'string') return msg[0];
+  return generico;
+}
+
 export function PortalLoginPage() {
   const navigate = useNavigate();
   const setTokens = usePortalAuth((s) => s.setTokens);
@@ -67,8 +78,8 @@ export function PortalLoginPage() {
       setDevOtp(data.devOtp ?? null);
       setDigits(new Array(6).fill(''));
       setPaso(2);
-    } catch {
-      setErr('No se pudo enviar el código. Verifica tu teléfono o correo.');
+    } catch (err: unknown) {
+      setErr(mensajeDeError(err, 'No se pudo enviar el código. Verifica tu teléfono o correo.'));
     } finally { setLoading(false); }
   }
 
@@ -82,8 +93,8 @@ export function PortalLoginPage() {
       });
       setTokens(data.accessToken, data.refreshToken);
       navigate('/portal');
-    } catch {
-      setErr('Código incorrecto o expirado. Intenta de nuevo.');
+    } catch (err: unknown) {
+      setErr(mensajeDeError(err, 'Código incorrecto o expirado. Intenta de nuevo.'));
     } finally { setLoading(false); }
   }
 
