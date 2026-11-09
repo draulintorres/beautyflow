@@ -63,6 +63,11 @@ services:
       FRONTEND_URL: ${FRONTEND_URL}
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: ${EMAIL_FROM}
+      # Cantidad de proxies de confianza delante de la app (Express
+      # "trust proxy"). 1 = Caddy delante (default). Subir a 2 si se pone
+      # Cloudflare delante de Caddy, y en ese caso también configurar
+      # trusted_proxies en Caddy.
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       TZ: UTC
     depends_on:
       postgres:
