@@ -77,10 +77,24 @@ hace falta tocarlo si el backend corre en el puerto por defecto.
 ## 3. Entrar
 
 Abre `http://localhost:5173/login` y entra con las credenciales demo de
-arriba. También existen `/admin/login` (panel de SuperAdmin — ver
-credenciales en `backend/prisma/seed-superadmin.ts`, hay que correr ese seed
-aparte con `npx ts-node prisma/seed-superadmin.ts` si lo quieres probar) y
+arriba. También existen `/admin/login` (panel de SuperAdmin) y
 `/portal/login` (Portal del Cliente).
+
+Para probar `/admin/login`, hay que correr `backend/prisma/seed-superadmin.ts`
+aparte — no corre junto con el seed normal. Correo, nombre y clave salen
+de variables de entorno, nunca de un valor fijo en el archivo:
+
+```bash
+SUPERADMIN_SEED_EMAIL="admin@tu-dominio.com" \
+SUPERADMIN_SEED_PASSWORD="una-clave-fuerte" \
+npx ts-node prisma/seed-superadmin.ts
+```
+
+- `SUPERADMIN_SEED_EMAIL` — obligatoria. Sin ella, el seed falla con un
+  error claro en vez de sembrar un correo por defecto.
+- `SUPERADMIN_SEED_PASSWORD` — obligatoria (igual que antes).
+- `SUPERADMIN_SEED_NAME` — opcional, nombre que se muestra en el panel.
+  Si no se define, usa "Estixa Admin".
 
 ## Qué NO vas a tener funcionando de entrada
 
