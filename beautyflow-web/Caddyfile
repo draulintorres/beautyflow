@@ -19,14 +19,24 @@
 	# /api/v1/admin/*: prefijo real confirmado con grep sobre
 	# @Controller('admin') en superadmin.controller.ts) responden 404.
 	#
-	# Sin ADMIN_HOST (desarrollo local, un solo host), "{$ADMIN_HOST}"
-	# se sustituye por una cadena vacía ANTES de que Caddy compile esta
-	# expresión -- queda literalmente `"" != ""`, una comparación
-	# constante-falsa, así que este bloque nunca se activa y /admin/login
-	# sigue funcionando exactamente igual que antes (verificado con
-	# `caddy adapt`: sin ADMIN_HOST el JSON generado trae ese expr literal).
+	# Esta expresión compara CONTRA DOS valores, no solo contra vacío:
+	# - "" cubre quien corre este Caddyfile directo (sin Docker Compose)
+	#   y nunca definió ADMIN_HOST -- ahí "{$ADMIN_HOST}" se sustituye por
+	#   una cadena vacía ANTES de que Caddy compile la expresión.
+	# - "http://admin.invalid" cubre el caso real de Compose: su propio
+	#   default (ver docker-compose.yml, ADMIN_HOST: ${ADMIN_HOST:-...})
+	#   SIEMPRE entrega ese mismo sentinela cuando el .env no define
+	#   ADMIN_HOST -- Compose nunca manda la variable realmente vacía.
+	#   Sin esta segunda comparación, con Compose el matcher vería
+	#   "http://admin.invalid" != "" -> verdadero, y bloquearía /admin/*
+	#   en el host de negocio incluso en desarrollo local (confirmado
+	#   corriendo el contenedor real antes de este fix: /admin/login daba
+	#   404 en vez de 200 sin querer).
+	# En ambos casos la expresión completa queda constante-falsa y este
+	# bloque nunca se activa -- /admin/login sigue funcionando igual que
+	# antes (verificado con `caddy adapt` y con el contenedor corriendo).
 	@bloqueaAdminEnApp {
-		expression `"{$ADMIN_HOST}" != ""`
+		expression `"{$ADMIN_HOST}" != "" && "{$ADMIN_HOST}" != "http://admin.invalid"`
 		path /admin /admin/* /api/v1/admin /api/v1/admin/*
 	}
 	handle @bloqueaAdminEnApp {

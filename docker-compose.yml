@@ -99,11 +99,25 @@ services:
       # Opcional — host del panel de SuperAdmin (ej. "admin.estixa.com").
       # Sin definir, /admin/login sigue funcionando en APP_HOST como
       # siempre (modo local, un solo host). Ver beautyflow-web/Caddyfile.
-      ADMIN_HOST: ${ADMIN_HOST:-}
+      #
+      # El default AQUÍ es el mismo sentinela inerte que usa el Caddyfile
+      # ("http://admin.invalid"), NUNCA vacío: si el .env real no define
+      # ADMIN_HOST, Compose igual crea la variable dentro del contenedor
+      # (solo que vacía) — y Caddy, a diferencia de Compose, NO trata
+      # "definida pero vacía" igual que "no definida": su propio default
+      # `{$ADMIN_HOST:http://admin.invalid}` del Caddyfile nunca se aplica
+      # en ese caso, y una dirección de sitio vacía hace que `caddy
+      # validate`/`caddy run` fallen con "server block without any key is
+      # global configuration, and if used, it must be first" (confirmado
+      # con el binario real). Poniendo el sentinela acá, en el propio
+      # default de Compose, el contenedor nunca ve ADMIN_HOST vacía.
+      ADMIN_HOST: ${ADMIN_HOST:-http://admin.invalid}
       # Opcional — dominio(s) raíz que solo redirigen a la app (ej.
       # "estixa.com, www.estixa.com" — coma CON espacio, Caddy exige esa
-      # sintaxis). Requiere APP_PUBLIC_URL si se define.
-      ROOT_HOSTS: ${ROOT_HOSTS:-}
+      # sintaxis). Requiere APP_PUBLIC_URL si se define. Mismo criterio
+      # de default que ADMIN_HOST (sentinela "http://root.invalid", no
+      # vacío) y por la misma razón.
+      ROOT_HOSTS: ${ROOT_HOSTS:-http://root.invalid}
       # URL pública completa de la app de negocio (con esquema, sin barra
       # final) — a donde redirige ROOT_HOSTS. Ej. "https://app.estixa.com".
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
