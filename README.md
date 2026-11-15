@@ -35,6 +35,9 @@ Edita `.env` con tus propios valores:
   ej. `createdb estixa`).
 - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_SUPERADMIN_SECRET` — pon
   cualquier string largo distinto en cada uno (ej. `openssl rand -hex 32`).
+- `TOTP_ENCRYPTION_KEY` — hex de 32 bytes (`openssl rand -hex 32`), cifra en
+  reposo el segundo factor (TOTP) del SuperAdmin. Obligatoria igual que los
+  JWT de arriba.
 - El resto de las variables ya tienen valores por defecto razonables para
   desarrollo local — ver la sección **Qué no vas a tener funcionando de
   entrada** más abajo antes de asumir que algo está roto.

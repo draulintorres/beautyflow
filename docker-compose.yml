@@ -60,6 +60,10 @@ services:
       # variable faltara -- la validación real es la del backend al
       # arrancar, no esta línea.
       JWT_PORTAL_SECRET: ${JWT_PORTAL_SECRET}
+      # Clave de cifrado (AES-256-GCM) de los secretos TOTP del SuperAdmin
+      # en reposo. Sin ":-default" a propósito, igual que los 4 JWT: la
+      # validación real es la del backend al arrancar (validateTotpEncryptionKey()).
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL}
       PORT: ${PORT}
       NODE_ENV: ${NODE_ENV}
