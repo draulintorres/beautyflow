@@ -1,3 +1,26 @@
+# El portal de clientes (/portal/*, /api/v1/portal/*) es otra fase del
+# proyecto -- todavía no multi-tenant de verdad (slug de empresa fijo en
+# PortalLoginPage.tsx, ver README) y por eso apagado por defecto. Este
+# snippet se importa en el host de negocio Y en el host admin (mismas
+# rutas relativas en ambos: /portal/login, /api/v1/portal/...) para no
+# duplicar el matcher -- un snippet de Caddy es un bloque con nombre que
+# se copia tal cual donde se importa (verificado con `caddy validate`:
+# un matcher nombrado definido dentro de un server block NO es visible
+# desde otro server block sin pasar por un snippet). El host raíz no lo
+# necesita: ahí todo responde con un redirect, nunca llega a estas rutas.
+# "{$PORTAL_ENABLED}" sin default: vacía (nunca definida) se sustituye
+# por "" antes de compilar la expresión, igual de inerte que "false"
+# (docker-compose.yml SIEMPRE manda "false" por defecto, nunca vacía).
+(bloqueo_portal) {
+	@bloqueaPortal {
+		expression `"{$PORTAL_ENABLED}" != "true"`
+		path /portal /portal/* /api/v1/portal /api/v1/portal/*
+	}
+	handle @bloqueaPortal {
+		respond 404
+	}
+}
+
 # Host de la app de negocio (RENOMBRADO de SITE_ADDRESS -> APP_HOST; ver
 # docker-compose.yml y .env.example). Local: ":80" (default si no está
 # definida). Producción: "app.estixa.com" — si alguna vez se necesita más
@@ -11,6 +34,8 @@
 # (o viceversa).
 {$APP_HOST::80} {
 	encode gzip
+
+	import bloqueo_portal
 
 	# Con ADMIN_HOST configurado (producción con dominios separados), el
 	# panel de SuperAdmin vive en su propio host (ver bloque ADMIN_HOST
@@ -74,6 +99,8 @@
 # siempre.
 {$ADMIN_HOST:http://admin.invalid} {
 	encode gzip
+
+	import bloqueo_portal
 
 	# "/" en el host admin entra directo al login del SuperAdmin.
 	redir / /admin/login 302

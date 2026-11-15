@@ -61,8 +61,11 @@ export class PortalAuthGuard implements CanActivate {
 
     let payload: PortalPayload;
     try {
+      // Secret propio del portal: un token de personal (firmado con
+      // JWT_ACCESS_SECRET) no verifica acá, ni siquiera llega al
+      // chequeo de tipo de abajo.
       payload = this.jwt.verify<PortalPayload>(auth.slice(7), {
-        secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
+        secret: this.config.getOrThrow('JWT_PORTAL_SECRET'),
       });
     } catch {
       throw new UnauthorizedException('Token inválido o expirado');

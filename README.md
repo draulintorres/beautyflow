@@ -80,6 +80,14 @@ Abre `http://localhost:5173/login` y entra con las credenciales demo de
 arriba. También existen `/admin/login` (panel de SuperAdmin) y
 `/portal/login` (Portal del Cliente).
 
+**Portal del Cliente — apagado por defecto en producción** (variable
+`PORTAL_ENABLED`, ver `.env.example` y `beautyflow-web/Caddyfile`): es
+otra fase del proyecto, todavía no lista para más de una empresa.
+Limitación conocida: `PortalLoginPage.tsx` tiene el slug de empresa
+`'beauty-glam'` fijo en el código (no lo toma de la URL) — antes de
+activar el portal para una segunda empresa, hay que cambiarlo a leer el
+slug de la ruta (ej. `/portal/:empresaSlug/login`).
+
 Para probar `/admin/login`, hay que correr `backend/prisma/seed-superadmin.ts`
 aparte — no corre junto con el seed normal. Correo, nombre y clave salen
 de variables de entorno, nunca de un valor fijo en el archivo:
