@@ -128,6 +128,13 @@ services:
       # URL pública completa de la app de negocio (con esquema, sin barra
       # final) — a donde redirige ROOT_HOSTS. Ej. "https://app.estixa.com".
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      # El portal de clientes es otra fase -- apagado por defecto en
+      # /portal/* y /api/v1/portal/* (ver beautyflow-web/Caddyfile).
+      # Default "false" NO vacío a propósito, misma lección que
+      # ADMIN_HOST/ROOT_HOSTS: una variable definida-vacía no equivale a
+      # "no definida" para el default propio de Caddy. Poner "true" acá
+      # para activar el portal.
+      PORTAL_ENABLED: ${PORTAL_ENABLED:-false}
     depends_on:
       backend:
         condition: service_healthy
