@@ -10,6 +10,7 @@ const JWT_SECRET_VARS = [
 const KEY_HEX_LENGTH = 64; // 32 bytes en hex
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
+const AUTH_TAG_LENGTH = 16;
 const FORMAT_PREFIX = 'v1';
 
 /**
@@ -110,13 +111,21 @@ export function descifrarSecreto(
     throw new TotpDecryptError();
   }
   const [, ivB64, tagB64, ctB64] = partes;
+  const iv = Buffer.from(ivB64, 'base64');
+  const tag = Buffer.from(tagB64, 'base64');
+
+  // Largo exacto de IV y de tag ANTES de llamar a node:crypto -- un IV u
+  // un tag truncado/alargado (dato corrupto o manipulado a mano) debe
+  // fallar como "no se pudo descifrar", no como una excepción distinta
+  // de node:crypto que podría filtrar detalles internos.
+  if (iv.length !== IV_LENGTH || tag.length !== AUTH_TAG_LENGTH) {
+    throw new TotpDecryptError();
+  }
 
   try {
-    const iv = Buffer.from(ivB64, 'base64');
-    const tag = Buffer.from(tagB64, 'base64');
     const ct = Buffer.from(ctB64, 'base64');
 
-    const decipher = createDecipheriv(ALGORITHM, key, iv);
+    const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
     decipher.setAAD(Buffer.from(adminId, 'utf8'));
     decipher.setAuthTag(tag);
     const plano = Buffer.concat([decipher.update(ct), decipher.final()]);

@@ -4,7 +4,6 @@ import {
   generarCodigosRespaldo,
   normalizarCodigoRespaldo,
   hashCodigoRespaldo,
-  verificarCodigoRespaldo,
 } from '../src/core/common/codigos-respaldo.util';
 
 test('genera 8 códigos distintos entre sí, en grupos separados por guion', () => {
@@ -16,32 +15,46 @@ test('genera 8 códigos distintos entre sí, en grupos separados por guion', () 
   }
 });
 
-test('normalización: mayúsculas, sin guiones ni espacios', () => {
+test('cada código tiene 80 bits de entropía (16 caracteres Crockford sin contar guiones)', () => {
+  const [codigo] = generarCodigosRespaldo(1);
+  const sinGuiones = codigo.replace(/-/g, '');
+  assert.equal(sinGuiones.length, 16);
+});
+
+test('normalización: mayúsculas, sin guiones ni espacios (sin caracteres ambiguos)', () => {
+  // Ningún carácter de este código real es O/I/L (el alfabeto Crockford ya
+  // los excluye) -- esta prueba cubre solo mayúsculas + separadores.
   assert.equal(normalizarCodigoRespaldo('abcd-efgh-jkmn-pqrs'), 'ABCDEFGHJKMNPQRS');
   assert.equal(normalizarCodigoRespaldo('ABCD EFGH JKMN PQRS'), 'ABCDEFGHJKMNPQRS');
   assert.equal(normalizarCodigoRespaldo('AbCd-EfGh-jKmN-pQrS'), 'ABCDEFGHJKMNPQRS');
 });
 
-test('código válido: verifica correctamente contra su propio hash, en cualquier formato', async () => {
-  const [codigo] = generarCodigosRespaldo(1);
-  const hash = await hashCodigoRespaldo(codigo);
-
-  assert.equal(await verificarCodigoRespaldo(codigo, hash), true);
-  assert.equal(await verificarCodigoRespaldo(codigo.toLowerCase(), hash), true);
-  assert.equal(await verificarCodigoRespaldo(codigo.replace(/-/g, ' '), hash), true);
+test('normalización: O/I/L (mayúsculas o minúsculas) se mapean a 0/1/1', () => {
+  assert.equal(normalizarCodigoRespaldo('O'), '0');
+  assert.equal(normalizarCodigoRespaldo('o'), '0');
+  assert.equal(normalizarCodigoRespaldo('I'), '1');
+  assert.equal(normalizarCodigoRespaldo('i'), '1');
+  assert.equal(normalizarCodigoRespaldo('L'), '1');
+  assert.equal(normalizarCodigoRespaldo('l'), '1');
+  assert.equal(normalizarCodigoRespaldo('O-I-L'), '011');
 });
 
-test('código inválido: no verifica contra un hash de otro código', async () => {
+test('hash estable: el mismo código normalizado da siempre el mismo hash SHA-256 (hex)', () => {
+  const [codigo] = generarCodigosRespaldo(1);
+  const hash1 = hashCodigoRespaldo(codigo);
+  const hash2 = hashCodigoRespaldo(codigo);
+  assert.equal(hash1, hash2);
+  assert.match(hash1, /^[0-9a-f]{64}$/);
+});
+
+test('hash estable entre formatos equivalentes (mayúsculas/minúsculas, con/sin guiones)', () => {
+  const [codigo] = generarCodigosRespaldo(1);
+  const hashOriginal = hashCodigoRespaldo(codigo);
+  assert.equal(hashCodigoRespaldo(codigo.toLowerCase()), hashOriginal);
+  assert.equal(hashCodigoRespaldo(codigo.replace(/-/g, ' ')), hashOriginal);
+});
+
+test('hash distinto para códigos distintos', () => {
   const [codigoA, codigoB] = generarCodigosRespaldo(2);
-  const hashA = await hashCodigoRespaldo(codigoA);
-  assert.equal(await verificarCodigoRespaldo(codigoB, hashA), false);
-});
-
-test('hash distinto cada vez, incluso para el mismo código (salt de bcrypt)', async () => {
-  const [codigo] = generarCodigosRespaldo(1);
-  const hash1 = await hashCodigoRespaldo(codigo);
-  const hash2 = await hashCodigoRespaldo(codigo);
-  assert.notEqual(hash1, hash2);
-  assert.equal(await verificarCodigoRespaldo(codigo, hash1), true);
-  assert.equal(await verificarCodigoRespaldo(codigo, hash2), true);
+  assert.notEqual(hashCodigoRespaldo(codigoA), hashCodigoRespaldo(codigoB));
 });

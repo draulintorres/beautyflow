@@ -8,6 +8,12 @@ import {
 } from '../src/core/common/totp.util';
 
 const PERIODO = 30;
+// Reloj fijo para todas las pruebas de verificarCodigoTotp() -- así
+// ninguna depende de en qué punto del paso de 30s esté corriendo el
+// reloj real (sin esto, una prueba que compara paso-1/paso+1 podría
+// fallar aleatoriamente si el paso cambia entre generar el código y
+// verificarlo).
+const AHORA_MS = 1_700_000_000_000;
 
 // ---------- Vectores oficiales RFC 6238 Apéndice B ----------
 // SHA1, 8 dígitos (el RFC solo publica vectores de 8 dígitos; producción
@@ -53,60 +59,81 @@ function generarCodigoEnPaso(secret: string, paso: number): string {
 
 test('ventana ±1: paso actual-1 se acepta y devuelve el paso correcto', async () => {
   const secret = generarSecretoTotp();
-  const pasoActual = pasoDe(Date.now() / 1000);
+  const pasoActual = pasoDe(AHORA_MS / 1000);
   const codigo = generarCodigoEnPaso(secret, pasoActual - 1);
-  const resultado = await verificarCodigoTotp(codigo, secret);
+  const resultado = await verificarCodigoTotp(codigo, secret, undefined, AHORA_MS);
   assert.equal(resultado.valido, true);
   assert.equal(resultado.paso, pasoActual - 1);
 });
 
 test('ventana ±1: paso actual+1 se acepta y devuelve el paso correcto', async () => {
   const secret = generarSecretoTotp();
-  const pasoActual = pasoDe(Date.now() / 1000);
+  const pasoActual = pasoDe(AHORA_MS / 1000);
   const codigo = generarCodigoEnPaso(secret, pasoActual + 1);
-  const resultado = await verificarCodigoTotp(codigo, secret);
+  const resultado = await verificarCodigoTotp(codigo, secret, undefined, AHORA_MS);
   assert.equal(resultado.valido, true);
   assert.equal(resultado.paso, pasoActual + 1);
 });
 
 test('fuera de la ventana: paso actual-2 se rechaza', async () => {
   const secret = generarSecretoTotp();
-  const pasoActual = pasoDe(Date.now() / 1000);
+  const pasoActual = pasoDe(AHORA_MS / 1000);
   const codigo = generarCodigoEnPaso(secret, pasoActual - 2);
-  const resultado = await verificarCodigoTotp(codigo, secret);
+  const resultado = await verificarCodigoTotp(codigo, secret, undefined, AHORA_MS);
   assert.equal(resultado.valido, false);
 });
 
 test('fuera de la ventana: paso actual+2 se rechaza', async () => {
   const secret = generarSecretoTotp();
-  const pasoActual = pasoDe(Date.now() / 1000);
+  const pasoActual = pasoDe(AHORA_MS / 1000);
   const codigo = generarCodigoEnPaso(secret, pasoActual + 2);
-  const resultado = await verificarCodigoTotp(codigo, secret);
+  const resultado = await verificarCodigoTotp(codigo, secret, undefined, AHORA_MS);
   assert.equal(resultado.valido, false);
 });
 
 test('paso actual: se acepta y coincide con pasoDe(ahora)', async () => {
   const secret = generarSecretoTotp();
-  const pasoActual = pasoDe(Date.now() / 1000);
+  const pasoActual = pasoDe(AHORA_MS / 1000);
   const codigo = generarCodigoEnPaso(secret, pasoActual);
-  const resultado = await verificarCodigoTotp(codigo, secret);
+  const resultado = await verificarCodigoTotp(codigo, secret, undefined, AHORA_MS);
   assert.equal(resultado.valido, true);
   assert.equal(resultado.paso, pasoActual);
 });
 
 test('anti-repetición: un paso <= ultimoPasoAceptado se rechaza aunque esté en la ventana', async () => {
   const secret = generarSecretoTotp();
-  const pasoActual = pasoDe(Date.now() / 1000);
+  const pasoActual = pasoDe(AHORA_MS / 1000);
   const codigo = generarCodigoEnPaso(secret, pasoActual);
-  const resultado = await verificarCodigoTotp(codigo, secret, pasoActual);
+  const resultado = await verificarCodigoTotp(codigo, secret, pasoActual, AHORA_MS);
   assert.equal(resultado.valido, false);
 });
 
 test('anti-repetición: un paso > ultimoPasoAceptado dentro de la ventana sigue válido', async () => {
   const secret = generarSecretoTotp();
-  const pasoActual = pasoDe(Date.now() / 1000);
+  const pasoActual = pasoDe(AHORA_MS / 1000);
   const codigo = generarCodigoEnPaso(secret, pasoActual);
-  const resultado = await verificarCodigoTotp(codigo, secret, pasoActual - 1);
+  const resultado = await verificarCodigoTotp(codigo, secret, pasoActual - 1, AHORA_MS);
+  assert.equal(resultado.valido, true);
+  assert.equal(resultado.paso, pasoActual);
+});
+
+// ---------- entrada mal formada: nunca lanza, siempre {valido:false} ----------
+
+test('entrada mal formada: nunca lanza, siempre devuelve valido=false', async () => {
+  const secret = generarSecretoTotp();
+  const entradas: unknown[] = ['', 'abcdef', '12345', '12345678', null, undefined];
+  for (const entrada of entradas) {
+    const resultado = await verificarCodigoTotp(entrada as string, secret, undefined, AHORA_MS);
+    assert.equal(resultado.valido, false, `entrada=${JSON.stringify(entrada)}`);
+  }
+});
+
+test('código con espacio en medio ("123 456"): se limpia y se evalúa igual que "123456"', async () => {
+  const secret = generarSecretoTotp();
+  const pasoActual = pasoDe(AHORA_MS / 1000);
+  const codigo = generarCodigoEnPaso(secret, pasoActual);
+  const conEspacio = `${codigo.slice(0, 3)} ${codigo.slice(3)}`;
+  const resultado = await verificarCodigoTotp(conEspacio, secret, undefined, AHORA_MS);
   assert.equal(resultado.valido, true);
   assert.equal(resultado.paso, pasoActual);
 });

@@ -36,6 +36,8 @@ export interface VerificacionTotp {
   paso?: number;
 }
 
+const FORMATO_CODIGO = /^\d{6}$/;
+
 /**
  * Verifica un código TOTP de 6 dígitos con ventana ±1 paso (tolera hasta
  * 30s de drift de reloj en cualquier dirección, como pide RFC 6238
@@ -44,15 +46,30 @@ export interface VerificacionTotp {
  * `ultimoPasoAceptado`, si se pasa, rechaza cualquier paso <= ese valor
  * (anti-repetición real -- no solo "el código es matemáticamente válido
  * en la ventana", sino "este paso específico no se usó ya").
+ *
+ * Nunca lanza por una entrada mal formada (vacía, con letras, de 5/8
+ * dígitos, null/undefined) -- el llamador es un endpoint HTTP que no
+ * debe distinguir "formato inválido" de "código incorrecto" en su
+ * respuesta, así que ambos casos devuelven simplemente {valido:false}.
+ *
+ * `ahoraMs`, si se pasa (epoch en milisegundos), fija el reloj usado
+ * para verificar -- pensado para pruebas deterministas que no dependan
+ * de en qué punto del paso de 30s esté el reloj real al correr.
  */
 export async function verificarCodigoTotp(
-  codigo: string,
+  codigo: string | null | undefined,
   secret: string,
   ultimoPasoAceptado?: number,
+  ahoraMs: number = Date.now(),
 ): Promise<VerificacionTotp> {
+  if (typeof codigo !== 'string') return { valido: false };
+  const limpio = codigo.replace(/\s+/g, '');
+  if (!FORMATO_CODIGO.test(limpio)) return { valido: false };
+
   const totp = crearTotp(secret);
-  const resultado = await totp.verify(codigo, {
+  const resultado = await totp.verify(limpio, {
     secret,
+    epoch: ahoraMs / 1000,
     epochTolerance: [PERIOD_SECONDS, PERIOD_SECONDS],
     ...(ultimoPasoAceptado !== undefined && { afterTimeStep: ultimoPasoAceptado }),
   });

@@ -129,3 +129,21 @@ test('dos cifrados del mismo texto plano dan resultados distintos (IV aleatorio)
   assert.equal(descifrarSecreto(a, 'admin-1', env), 'mismo-secreto');
   assert.equal(descifrarSecreto(b, 'admin-1', env), 'mismo-secreto');
 });
+
+test('tag truncado: falla con TotpDecryptError (nunca llega a node:crypto)', () => {
+  const env = envCripto();
+  const cifrado = cifrarSecreto('secreto', 'admin-1', env);
+  const [prefijo, iv, tagB64, ct] = cifrado.split(':');
+  const tagTruncado = Buffer.from(tagB64, 'base64').subarray(0, 8).toString('base64');
+  const alterado = [prefijo, iv, tagTruncado, ct].join(':');
+  assert.throws(() => descifrarSecreto(alterado, 'admin-1', env), TotpDecryptError);
+});
+
+test('IV de largo incorrecto: falla con TotpDecryptError (nunca llega a node:crypto)', () => {
+  const env = envCripto();
+  const cifrado = cifrarSecreto('secreto', 'admin-1', env);
+  const [prefijo, , tag, ct] = cifrado.split(':');
+  const ivCorto = Buffer.alloc(4).toString('base64');
+  const alterado = [prefijo, ivCorto, tag, ct].join(':');
+  assert.throws(() => descifrarSecreto(alterado, 'admin-1', env), TotpDecryptError);
+});
