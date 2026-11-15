@@ -207,8 +207,12 @@ export class PortalAuthService {
 
   private async emitirTokens(clienteId: string, empresaId: string) {
     const payload = { sub: clienteId, empresaId, tipo: 'portal' };
+    // Secret propio del portal (distinto del de personal): un token de
+    // portal ya no verifica con JWT_ACCESS_SECRET, así que ni
+    // TenantMiddleware ni JwtAuthGuard pueden aceptarlo en rutas de
+    // personal aunque se les olvidara el chequeo de tipo==='portal'.
     const accessToken = this.jwt.sign(payload, {
-      secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
+      secret: this.config.getOrThrow('JWT_PORTAL_SECRET'),
       expiresIn: '1h',
     });
     const refreshRaw = randomBytes(32).toString('hex');

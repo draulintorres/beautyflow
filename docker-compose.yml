@@ -53,6 +53,13 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_SUPERADMIN_SECRET: ${JWT_SUPERADMIN_SECRET}
+      # Secret propio del portal de clientes, distinto de los otros 3 (lo
+      # valida validateJwtSecrets() al arrancar). Sin ":-default" a
+      # propósito, igual que los otros 3: el script de respaldos del
+      # servidor corre `docker compose exec` y no debe romperse si esta
+      # variable faltara -- la validación real es la del backend al
+      # arrancar, no esta línea.
+      JWT_PORTAL_SECRET: ${JWT_PORTAL_SECRET}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL}
       PORT: ${PORT}
       NODE_ENV: ${NODE_ENV}
