@@ -14,18 +14,29 @@ async function main() {
       'Falta SUPERADMIN_SEED_PASSWORD en el entorno — no se puede sembrar el SuperAdmin sin ella.',
     );
   }
+  // El correo tampoco tiene default: "admin@beautyflow.do" era un correo
+  // de marca vieja hardcodeado -- cada entorno (staging, producción)
+  // debe sembrar el suyo explícitamente, sin reutilizar nada fijo acá.
+  const superadminEmail = process.env.SUPERADMIN_SEED_EMAIL;
+  if (!superadminEmail) {
+    throw new Error(
+      'Falta SUPERADMIN_SEED_EMAIL en el entorno — no se puede sembrar el SuperAdmin sin un correo.',
+    );
+  }
+  const superadminNombre = process.env.SUPERADMIN_SEED_NAME || 'Estixa Admin';
+
   const hash = await bcrypt.hash(superadminPassword, 12);
   await prisma.superAdmin.upsert({
-    where:  { email: 'admin@beautyflow.do' },
+    where:  { email: superadminEmail },
     update: {},
     create: {
-      nombre:       'Estixa Admin',
-      email:        'admin@beautyflow.do',
+      nombre:       superadminNombre,
+      email:        superadminEmail,
       passwordHash: hash,
       activo:       true,
     },
   });
-  console.log('✓ SuperAdmin: admin@beautyflow.do (clave tomada de SUPERADMIN_SEED_PASSWORD)');
+  console.log(`✓ SuperAdmin: ${superadminEmail} (clave tomada de SUPERADMIN_SEED_PASSWORD)`);
 
   // ── Planes SaaS ──────────────────────────────────────────
   // Trial y Básico: upsert por nombre (unique)

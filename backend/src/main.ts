@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './core/common/filters/all-exceptions.filter';
 import { resolveTrustProxyHops } from './core/common/trust-proxy.util';
+import { parseAllowedOrigins } from './core/common/allowed-origins.util';
 
 async function bootstrap() {
   // Se valida ANTES de crear la app (que ya conecta a la base de datos en
@@ -18,7 +19,7 @@ async function bootstrap() {
 
   app.use(helmet());
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') ?? true,
+    origin: parseAllowedOrigins(process.env.ALLOWED_ORIGINS),
     credentials: true,
   });
   app.setGlobalPrefix('api/v1');

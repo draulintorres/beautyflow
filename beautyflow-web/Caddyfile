@@ -1,12 +1,47 @@
-# Dirección del sitio desde la variable de entorno SITE_ADDRESS, con ":80"
-# como valor por defecto si no está definida (sintaxis {$VAR:default} —
-# verificada contra el binario real de Caddy: caddy validate, no de
-# memoria). Admite varias direcciones separadas por coma, ej.
-# "app.estixa.com, admin.estixa.com" — ahí Caddy obtiene/renueva el
-# certificado HTTPS automáticamente (requiere persistir /data, ver
-# docker-compose.yml). Local sigue funcionando en :80 (HTTP, sin TLS).
-{$SITE_ADDRESS::80} {
+# Host de la app de negocio (RENOMBRADO de SITE_ADDRESS -> APP_HOST; ver
+# docker-compose.yml y .env.example). Local: ":80" (default si no está
+# definida). Producción: "app.estixa.com" — si alguna vez se necesita más
+# de un host aquí, SEPARARLOS CON COMA Y ESPACIO ("host1.com, host2.com":
+# Caddy rechaza la coma sin espacio con un error de validación, verificado
+# con `caddy validate` contra el binario real).
+#
+# NUNCA poner staging.estixa.com en APP_HOST, ADMIN_HOST ni ROOT_HOSTS:
+# esa instancia comparte base de datos con producción -- mezclar sus
+# dominios aquí expondría datos de producción bajo el host de staging
+# (o viceversa).
+{$APP_HOST::80} {
 	encode gzip
+
+	# Con ADMIN_HOST configurado (producción con dominios separados), el
+	# panel de SuperAdmin vive en su propio host (ver bloque ADMIN_HOST
+	# más abajo) -- en el host de negocio, tanto las rutas del front
+	# (/admin, /admin/*) como la API del SuperAdmin (/api/v1/admin,
+	# /api/v1/admin/*: prefijo real confirmado con grep sobre
+	# @Controller('admin') en superadmin.controller.ts) responden 404.
+	#
+	# Esta expresión compara CONTRA DOS valores, no solo contra vacío:
+	# - "" cubre quien corre este Caddyfile directo (sin Docker Compose)
+	#   y nunca definió ADMIN_HOST -- ahí "{$ADMIN_HOST}" se sustituye por
+	#   una cadena vacía ANTES de que Caddy compile la expresión.
+	# - "http://admin.invalid" cubre el caso real de Compose: su propio
+	#   default (ver docker-compose.yml, ADMIN_HOST: ${ADMIN_HOST:-...})
+	#   SIEMPRE entrega ese mismo sentinela cuando el .env no define
+	#   ADMIN_HOST -- Compose nunca manda la variable realmente vacía.
+	#   Sin esta segunda comparación, con Compose el matcher vería
+	#   "http://admin.invalid" != "" -> verdadero, y bloquearía /admin/*
+	#   en el host de negocio incluso en desarrollo local (confirmado
+	#   corriendo el contenedor real antes de este fix: /admin/login daba
+	#   404 en vez de 200 sin querer).
+	# En ambos casos la expresión completa queda constante-falsa y este
+	# bloque nunca se activa -- /admin/login sigue funcionando igual que
+	# antes (verificado con `caddy adapt` y con el contenedor corriendo).
+	@bloqueaAdminEnApp {
+		expression `"{$ADMIN_HOST}" != "" && "{$ADMIN_HOST}" != "http://admin.invalid"`
+		path /admin /admin/* /api/v1/admin /api/v1/admin/*
+	}
+	handle @bloqueaAdminEnApp {
+		respond 404
+	}
 
 	# Mismo origen: todo lo que empiece con /api va al backend, sin tocar
 	# el path (el backend ya espera el prefijo api/v1 completo).
@@ -21,4 +56,49 @@
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+# Host del panel de SuperAdmin -- opcional. "http://admin.invalid"
+# (dominio reservado para documentación/pruebas por RFC 2606, nunca
+# resoluble en DNS real) como default: si ADMIN_HOST no está definida,
+# este bloque queda con una dirección que ningún tráfico real puede
+# alcanzar, así que es inerte sin romper `caddy validate` (una dirección
+# vacía aquí SÍ rompe la validación -- Caddy la interpreta como bloque de
+# configuración global y exige que vaya primero; verificado con el
+# binario real). El esquema "http://" en el DEFAULT es a propósito: sin
+# él, Caddy trata "admin.invalid" como un dominio público real y entra en
+# un loop de reintentos fallidos contra Let's Encrypt (confirmado
+# corriendo el contenedor real sin ADMIN_HOST definida -- logueaba error
+# tras error). Cuando ADMIN_HOST SÍ está definida (ej. "admin.estixa.com",
+# sin esquema), el default no se usa y Caddy gestiona su HTTPS real como
+# siempre.
+{$ADMIN_HOST:http://admin.invalid} {
+	encode gzip
+
+	# "/" en el host admin entra directo al login del SuperAdmin.
+	redir / /admin/login 302
+
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Dominio(s) raíz -- opcionales, mismo criterio de default inerte que
+# ADMIN_HOST ("http://root.invalid" -- ver esa nota sobre por qué el
+# esquema "http://" es necesario en el default). Si ROOT_HOSTS está
+# definida (ej. "estixa.com, www.estixa.com" -- misma regla de
+# coma+espacio), estos hosts responden SIEMPRE con un 302 (temporal a
+# propósito: más adelante esto puede convertirse en una página de
+# presentación propia, no en un redirect permanente) hacia
+# APP_PUBLIC_URL, conservando la ruta y la consulta originales vía
+# {uri}. El destino sale de una variable (APP_PUBLIC_URL) y nunca queda
+# fijo acá en el Caddyfile.
+{$ROOT_HOSTS:http://root.invalid} {
+	redir {$APP_PUBLIC_URL}{uri} 302
 }
