@@ -5,7 +5,6 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import {
@@ -31,6 +30,7 @@ import { EmailService } from '../../core/email/email.service';
 import { RateLimiterService } from '../../core/common/rate-limiter.service';
 import { TooManyRequestsException } from '../../core/common/too-many-requests.exception';
 import { normalizarIp } from '../../core/common/normalizar-ip.util';
+import { SuperAdminTotpService } from './superadmin-totp.service';
 
 /**
  * Servicio del Super Admin. Opera SIN contexto de tenant: usa el cliente
@@ -46,11 +46,11 @@ export class SuperAdminService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly modulosEfectivos: ModulosEfectivosService,
     private readonly email: EmailService,
     private readonly rateLimiter: RateLimiterService,
+    private readonly totp: SuperAdminTotpService,
   ) {
     // Sin barra final — ver mismo fix en auth.service.ts (FRONTEND_URL en
     // Render viene con una al final).
@@ -58,6 +58,13 @@ export class SuperAdminService {
   }
 
   // ============ AUTH ============
+  /**
+   * Primer paso del login (contraseña). NUNCA devuelve un accessToken
+   * real -- ni con la contraseña correcta: devuelve un challengeToken de
+   * corta duración y requiereAlta (si el admin todavía no tiene 2FA
+   * activo). El accessToken real solo lo emite SuperAdminTotpService,
+   * tras el segundo paso (ver superadmin-totp.service.ts).
+   */
   async login(dto: SuperAdminLoginDto, ip: string) {
     const rlKey = `admin-login:${normalizarIp(ip)}|${dto.email}`;
 
@@ -87,23 +94,12 @@ export class SuperAdminService {
     }
 
     this.rateLimiter.reset(rlKey);
+    // ultimoLogin NO se actualiza aquí -- se actualiza en el segundo paso
+    // (confirmar-alta / verificar-totp): la contraseña sola ya no basta
+    // para completar un login.
 
-    await this.prisma.superAdmin.update({
-      where: { id: admin.id },
-      data: { ultimoLogin: new Date() },
-    });
-
-    const accessToken = this.jwt.sign(
-      { sub: admin.id, tipo: 'superadmin' },
-      {
-        secret: this.config.getOrThrow('JWT_SUPERADMIN_SECRET'),
-        expiresIn: '8h',
-      },
-    );
-    return {
-      accessToken,
-      admin: { id: admin.id, nombre: admin.nombre, email: admin.email },
-    };
+    const challengeToken = this.totp.emitirChallenge(admin.id, admin.totpActivo ? 'verificar' : 'alta');
+    return { challengeToken, requiereAlta: !admin.totpActivo };
   }
 
   // ============ EMPRESAS ============

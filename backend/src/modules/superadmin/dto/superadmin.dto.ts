@@ -28,6 +28,33 @@ export class SuperAdminLoginDto {
   password: string;
 }
 
+// ---------- AUTH: segundo factor (TOTP) ----------
+export class ChallengeTokenDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000) // JWT real: unas pocas centenas de caracteres -- tope generoso
+  challengeToken: string;
+}
+
+export class ConfirmarAltaDto extends ChallengeTokenDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20)
+  codigo: string;
+}
+
+export class VerificarTotpDto extends ChallengeTokenDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  codigo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40) // código de respaldo con guiones, ej. "ABCD-EFGH-JKMN-PQRS"
+  codigoRespaldo?: string;
+}
+
 // ---------- EMPRESAS ----------
 export class CrearEmpresaDto {
   @IsString()

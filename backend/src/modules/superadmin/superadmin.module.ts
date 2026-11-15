@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { EmailModule } from '../../core/email/email.module';
 import { SuperAdminService } from './superadmin.service';
 import { SuperAdminBillingService } from './superadmin-billing.service';
+import { SuperAdminTotpService } from './superadmin-totp.service';
 import { LimitsService } from './limits.service';
 import { ModulosEfectivosService } from './modulos-efectivos.service';
 import { SuperAdminController } from './superadmin.controller';
@@ -20,6 +21,7 @@ import { SuperAdminGuard } from './guards/superadmin.guard';
   providers: [
     SuperAdminService,
     SuperAdminBillingService,
+    SuperAdminTotpService,
     LimitsService,
     ModulosEfectivosService,
     SuperAdminGuard,

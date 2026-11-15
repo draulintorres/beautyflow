@@ -11,13 +11,18 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Header,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { SuperAdminService } from './superadmin.service';
 import { SuperAdminBillingService } from './superadmin-billing.service';
+import { SuperAdminTotpService } from './superadmin-totp.service';
 import {
   SuperAdminLoginDto,
+  ChallengeTokenDto,
+  ConfirmarAltaDto,
+  VerificarTotpDto,
   CrearEmpresaDto,
   EditarEmpresaDto,
   CrearPlanDto,
@@ -37,6 +42,7 @@ export class SuperAdminController {
   constructor(
     private readonly sa: SuperAdminService,
     private readonly billing: SuperAdminBillingService,
+    private readonly totp: SuperAdminTotpService,
   ) {}
 
   // ---------- AUTH ----------
@@ -45,6 +51,31 @@ export class SuperAdminController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: SuperAdminLoginDto, @Req() req: Request) {
     return this.sa.login(dto, req.ip ?? 'desconocida');
+  }
+
+  // Segundo paso: alta obligatoria del 2FA (si el admin no lo tiene activo).
+  @SaPublic()
+  @Post('login/totp/iniciar-alta')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  iniciarAltaTotp(@Body() dto: ChallengeTokenDto, @Req() req: Request) {
+    return this.totp.iniciarAlta(dto.challengeToken, req.ip ?? 'desconocida');
+  }
+
+  @SaPublic()
+  @Post('login/totp/confirmar-alta')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  confirmarAltaTotp(@Body() dto: ConfirmarAltaDto, @Req() req: Request) {
+    return this.totp.confirmarAlta(dto.challengeToken, dto.codigo, req.ip ?? 'desconocida');
+  }
+
+  // Segundo paso: verificación normal (2FA ya activo).
+  @SaPublic()
+  @Post('login/verificar-totp')
+  @HttpCode(HttpStatus.OK)
+  verificarTotp(@Body() dto: VerificarTotpDto, @Req() req: Request) {
+    return this.totp.verificarTotp(dto.challengeToken, dto.codigo, dto.codigoRespaldo, req.ip ?? 'desconocida');
   }
 
   // ---------- DASHBOARD ----------

@@ -31,6 +31,7 @@
     "helmet": "^7.1.0",
     "otplib": "13.6.0",
     "pdfkit": "^0.15.0",
+    "qrcode-generator": "2.0.4",
     "reflect-metadata": "^0.2.1",
     "resend": "^6.28.0",
     "rxjs": "^7.8.1"
