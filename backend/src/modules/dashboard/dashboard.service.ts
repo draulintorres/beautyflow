@@ -572,11 +572,24 @@ export class DashboardService {
     return resultados;
   }
 
+  /**
+   * Commit 8 (NO zona horaria): mismo hueco que flujoCajaUltimos30Dias()
+   * antes del commit 7 -- no filtraba por estado en absoluto, así que
+   * sumaba pagos de ventas ANULADAS como si fueran cobros reales. anular()
+   * nunca marca sus Pago como REFUNDED, así que sin este filtro quedaban
+   * contados para siempre en la tarjeta "Formas de pago" del dashboard.
+   */
   private async formasDePago(sucursalId: string | null) {
+    const sucVenta = this.sucFilterViaVenta(sucursalId);
     const grupos = await this.prisma.db.pago.groupBy({
       by: ['metodoPagoId'],
       where: {
-        venta: { ...this.sucFilterViaVenta(sucursalId).venta, ...this.ventaSinInquilinos() },
+        estado: PagoStatus.CONFIRMED,
+        venta: {
+          ...sucVenta.venta,
+          ...this.ventaSinInquilinos(),
+          estado: { not: VentaStatus.ANULADA },
+        },
       } as Prisma.PagoWhereInput,
       _sum: { monto: true },
       _count: true,
