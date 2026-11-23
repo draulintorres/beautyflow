@@ -12,6 +12,20 @@ import {
   rangoMesRDReal,
   rangoAnioRDReal,
 } from '../../core/common/fecha-rd.util';
+import { VentaStatus } from '@prisma/client';
+
+/**
+ * Estados de Venta que NO cuentan como ingreso real en las métricas de
+ * ventas del dashboard (hoy, mes, por sucursal, ticket promedio, 12 meses,
+ * desglose diario) -- Commit 7, NO zona horaria. ANULADA ya se excluía;
+ * OPEN es un borrador sin cobrar (solo lo crea POST /ventas/from-cita/:id,
+ * ningún flujo del frontend lo completa ni lo cobra hoy) que antes se
+ * sumaba igual que una venta real.
+ */
+export const ESTADOS_EXCLUIDOS_METRICAS_VENTA: VentaStatus[] = [
+  VentaStatus.ANULADA,
+  VentaStatus.OPEN,
+];
 
 export interface RangosDashboard {
   diaReal: { gte: Date; lt: Date };

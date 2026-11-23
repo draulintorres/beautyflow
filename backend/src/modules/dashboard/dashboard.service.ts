@@ -12,9 +12,11 @@ import {
   construirRangosDashboard,
   rangoDesglosarMes,
   rangoUltimos12Meses,
+  ESTADOS_EXCLUIDOS_METRICAS_VENTA,
 } from './dashboard-rangos.util';
 import {
   VentaStatus,
+  PagoStatus,
   CitaStatus,
   LineaTipo,
   ModeloPago,
@@ -129,7 +131,7 @@ export class DashboardService {
           ...sucVenta,
           ...this.ventaSinInquilinos(),
           createdAt: { gte: diaReal.gte, lt: diaReal.lt },
-          estado: { not: VentaStatus.ANULADA },
+          estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
         },
         _sum: { total: true },
         _count: true,
@@ -141,7 +143,7 @@ export class DashboardService {
           ...sucVenta,
           ...this.ventaSinInquilinos(),
           createdAt: { gte: mesReal.gte },
-          estado: { not: VentaStatus.ANULADA },
+          estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
         },
         _sum: { total: true },
       }),
@@ -172,7 +174,7 @@ export class DashboardService {
           ...sucVenta,
           ...this.ventaSinInquilinos(),
           createdAt: { gte: mesReal.gte },
-          estado: { not: VentaStatus.ANULADA },
+          estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
         },
         _avg: { total: true },
       }),
@@ -317,7 +319,7 @@ export class DashboardService {
               sucursalId: s.id,
               ...this.ventaSinInquilinos(),
               createdAt: { gte: diaReal.gte, lt: diaReal.lt },
-              estado: { not: VentaStatus.ANULADA },
+              estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
             },
             _sum: { total: true },
             _count: true,
@@ -327,7 +329,7 @@ export class DashboardService {
               sucursalId: s.id,
               ...this.ventaSinInquilinos(),
               createdAt: { gte: mesReal.gte },
-              estado: { not: VentaStatus.ANULADA },
+              estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
             },
             _sum: { total: true },
           }),
@@ -453,7 +455,7 @@ export class DashboardService {
           ...this.sucFilter(sucursalId),
           ...this.ventaSinInquilinos(),
           createdAt: { gte, lt },
-          estado: { not: VentaStatus.ANULADA },
+          estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
         },
         select: { createdAt: true, total: true },
       });
@@ -484,7 +486,7 @@ export class DashboardService {
         ...this.sucFilter(sucursalId),
         ...this.ventaSinInquilinos(),
         createdAt: { gte: desde, ...(hasta && { lt: hasta }) },
-        estado: { not: VentaStatus.ANULADA },
+        estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
       },
       select: { createdAt: true, total: true },
     });
@@ -507,7 +509,7 @@ export class DashboardService {
       where: {
         ...this.sucFilter(sucursalId),
         ...this.ventaSinInquilinos(),
-        estado: { not: VentaStatus.ANULADA },
+        estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
       },
       _sum: { total: true },
       _count: true,
@@ -593,16 +595,24 @@ export class DashboardService {
 
   /** Flujo de caja: entradas (pagos) por día en los últimos 30 días.
    * Pago.createdAt es instante real -- fecha de corte y llave del mapa
-   * con fechaRDDeInstante, no con toISOString()/getters locales. */
+   * con fechaRDDeInstante, no con toISOString()/getters locales.
+   *
+   * Commit 7 (NO zona horaria): no filtraba por estado en absoluto --
+   * sumaba pagos de ventas ANULADAS (y de OPEN) como si fueran entradas
+   * reales de caja. anular() nunca marca sus Pago como REFUNDED, así que
+   * sin excluir por venta.estado esos pagos quedaban contados para siempre.
+   */
   private async flujoCajaUltimos30Dias(sucursalId: string | null) {
     const haceTreintaDias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const desde = rangoDiaRDReal(fechaRDDeInstante(haceTreintaDias)).gte;
 
+    const sucVenta = this.sucFilterViaVenta(sucursalId);
     const pagos = await this.prisma.db.pago.findMany({
       where: {
         createdAt: { gte: desde },
-        ...(this.sucFilterViaVenta(sucursalId) as Prisma.PagoWhereInput),
-      },
+        estado: PagoStatus.CONFIRMED,
+        venta: { ...sucVenta.venta, estado: { not: VentaStatus.ANULADA } },
+      } as Prisma.PagoWhereInput,
       select: { createdAt: true, monto: true },
     });
 

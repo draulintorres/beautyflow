@@ -9,8 +9,10 @@ import {
   construirRangosDashboard,
   rangoDesglosarMes,
   rangoUltimos12Meses,
+  ESTADOS_EXCLUIDOS_METRICAS_VENTA,
 } from '../src/modules/dashboard/dashboard-rangos.util';
 import { fechaRDDeInstante, mesRDDeInstante } from '../src/core/common/fecha-rd.util';
+import { VentaStatus } from '@prisma/client';
 
 // ---------- construirRangosDashboard: "hoy" para Venta.createdAt ----------
 
@@ -106,4 +108,15 @@ test('rangoUltimos12Meses sin año: la ventana móvil cruza el fin de año corre
   assert.equal(clavesMeses[0], '2025-03');
   assert.equal(clavesMeses.includes('2025-12'), true);
   assert.equal(clavesMeses.includes('2026-01'), true);
+});
+
+// ---------- ESTADOS_EXCLUIDOS_METRICAS_VENTA (Commit 7, NO zona horaria) ----------
+
+test('ESTADOS_EXCLUIDOS_METRICAS_VENTA excluye ANULADA y OPEN, nada más', () => {
+  assert.equal(ESTADOS_EXCLUIDOS_METRICAS_VENTA.includes(VentaStatus.ANULADA), true);
+  assert.equal(ESTADOS_EXCLUIDOS_METRICAS_VENTA.includes(VentaStatus.OPEN), true);
+  assert.equal(ESTADOS_EXCLUIDOS_METRICAS_VENTA.includes(VentaStatus.PAGADA), false);
+  assert.equal(ESTADOS_EXCLUIDOS_METRICAS_VENTA.includes(VentaStatus.PENDIENTE), false);
+  assert.equal(ESTADOS_EXCLUIDOS_METRICAS_VENTA.includes(VentaStatus.ABONO_PARCIAL), false);
+  assert.equal(ESTADOS_EXCLUIDOS_METRICAS_VENTA.length, 2);
 });

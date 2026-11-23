@@ -3,6 +3,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { ReporteQueryDto, ReporteTabular } from './dto/reporte.dto';
 import {
   VentaStatus,
+  PagoStatus,
   CitaStatus,
   ModeloPago,
   FlujoDineroAlquiler,
@@ -418,13 +419,20 @@ export class ReportesDataService {
   }
 
   // ---------- FLUJO DE CAJA ----------
+  /**
+   * Commit 7 (NO zona horaria): no filtraba por estado en absoluto -- sumaba
+   * pagos de ventas ANULADAS como entradas reales. anular() nunca marca sus
+   * Pago como REFUNDED, así que sin excluir por venta.estado quedaban
+   * contados para siempre; se exige además Pago.estado = CONFIRMED.
+   */
   async flujoCaja(q: ReporteQueryDto): Promise<ReporteTabular> {
     const where = this.rangoFecha(q, 'createdAt');
     const sucursalId = await this.sucursalEfectiva(q);
     const pagos = await this.prisma.db.pago.findMany({
       where: {
         ...where,
-        venta: this.ventaFiltro(sucursalId),
+        estado: PagoStatus.CONFIRMED,
+        venta: { ...this.ventaFiltro(sucursalId), estado: { not: VentaStatus.ANULADA } },
       },
       include: { metodoPago: { select: { nombre: true } } },
     });
