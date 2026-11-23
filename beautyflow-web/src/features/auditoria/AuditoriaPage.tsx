@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { formatHora12 } from '../../lib/format';
 import {
   type AuditItem,
   MODULOS_AUDITORIA,
@@ -24,7 +25,7 @@ function fmtFecha(iso: string): { fecha: string; hora: string } {
   const d = new Date(iso);
   return {
     fecha: d.toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' }),
-    hora: d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' }),
+    hora: formatHora12(d),
   };
 }
 

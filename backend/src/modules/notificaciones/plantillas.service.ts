@@ -3,7 +3,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { NotificationService } from './notification.service';
 import { UpsertPlantillaDto, PLANTILLAS_DEFECTO } from './dto/notificacion.dto';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
-import { fechaHoyRD, rangoDiaRD } from '../../core/common/fecha-rd.util';
+import { fechaHoyRD, rangoDiaRD, hora12DeNaive } from '../../core/common/fecha-rd.util';
 import {
   NotificacionEvento,
   CanalNotificacion,
@@ -90,7 +90,8 @@ export class NotificacionesJobsService {
         clienteId: c.clienteId,
         variables: {
           fecha: c.inicio.toISOString().slice(0, 10),
-          hora: this.hhmm(c.inicio),
+          // Texto final (WhatsApp/correo al cliente) -- en 12h, no "HH:mm".
+          hora: hora12DeNaive(c.inicio),
         },
         referenciaTipo: 'CITA',
         referenciaId: c.id,
@@ -151,9 +152,5 @@ export class NotificacionesJobsService {
       enviados++;
     }
     return { enviados };
-  }
-
-  private hhmm(d: Date): string {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 }

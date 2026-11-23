@@ -157,3 +157,68 @@ export function diaSemanaRD(fecha: string): number {
   const [y, m, d] = fecha.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
+
+// ======================= HORA EN 12 HORAS =======================
+//
+// Formato de salida fijo en todo el proyecto para cualquier hora que vea
+// el usuario: "H:mm AP" -- sin cero a la izquierda en la hora, AM/PM en
+// mayúsculas, un espacio ASCII normal, armado a mano (sin Intl ni
+// toLocaleTimeString, que dependen del locale/TZ del runtime y pueden
+// variar el separador o el espacio). 12:00 AM = medianoche, 12:00 PM =
+// mediodía. Mismo criterio que ya usa el frontend (AgendaPage.tsx#labelTime12
+// y sus 3 copias duplicadas) -- estas funciones son el equivalente del
+// lado del backend, para texto que NO pasa por un conversor del frontend
+// (WhatsApp, correos, avisos internos, recibos, reportes exportados).
+//
+// Cada función toma un tipo de entrada distinto -- usar la que corresponda
+// al campo real, igual que con los rangos de arriba:
+//   - horaDe24a12: string "HH:mm" ya extraído (ej. de un formulario).
+//   - hora12DeNaive: Date "naive" (Cita.inicio/fin) -- lee con
+//     getUTCHours/getUTCMinutes (los dígitos YA SON la hora de RD).
+//   - hora12DeInstante / fechaHora12DeInstante: Date instante REAL
+//     (createdAt, fechaCierre) -- resta las 4h de offset antes de leer.
+
+function formatearHora12(horas: number, minutos: number): string {
+  const periodo = horas < 12 ? 'AM' : 'PM';
+  const horas12 = horas === 0 ? 12 : horas > 12 ? horas - 12 : horas;
+  return `${horas12}:${String(minutos).padStart(2, '0')} ${periodo}`;
+}
+
+const FORMATO_HHMM = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+
+/** string "HH:mm" (24h) -> "H:mm AP". Entrada inválida: devuelve la
+ * cadena original tal cual, sin lanzar. */
+export function horaDe24a12(hhmm: string): string {
+  const m = FORMATO_HHMM.exec(hhmm);
+  if (!m) return hhmm;
+  return formatearHora12(Number(m[1]), Number(m[2]));
+}
+
+/** Date "naive" (Cita.inicio/fin) -> "H:mm AP", leyendo los dígitos tal
+ * cual con getUTC* (son la hora de RD, no un instante UTC real). Date
+ * inválida: no lanza, devuelve String(d) ("Invalid Date"). */
+export function hora12DeNaive(d: Date): string {
+  if (isNaN(d.getTime())) return String(d);
+  return formatearHora12(d.getUTCHours(), d.getUTCMinutes());
+}
+
+/** Date instante REAL (createdAt, fechaCierre) -> "H:mm AP" en hora de
+ * RD -- resta las 4h de offset antes de leer. Date inválida: no lanza,
+ * devuelve String(d). */
+export function hora12DeInstante(d: Date): string {
+  if (isNaN(d.getTime())) return String(d);
+  const naive = new Date(d.getTime() - OFFSET_RD_MS);
+  return formatearHora12(naive.getUTCHours(), naive.getUTCMinutes());
+}
+
+/** Date instante REAL -> "dd/mm/yyyy H:mm AP" (fecha Y hora en RD), ej.
+ * "21/11/2026 8:25 PM" para una venta cobrada a las 20:25 RD. Date
+ * inválida: no lanza, devuelve String(d). */
+export function fechaHora12DeInstante(d: Date): string {
+  if (isNaN(d.getTime())) return String(d);
+  const naive = new Date(d.getTime() - OFFSET_RD_MS);
+  const dd = String(naive.getUTCDate()).padStart(2, '0');
+  const mm = String(naive.getUTCMonth() + 1).padStart(2, '0');
+  const yyyy = naive.getUTCFullYear();
+  return `${dd}/${mm}/${yyyy} ${formatearHora12(naive.getUTCHours(), naive.getUTCMinutes())}`;
+}

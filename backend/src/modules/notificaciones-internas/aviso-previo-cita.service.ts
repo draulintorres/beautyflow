@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantContext } from '../../core/tenant/tenant-context';
 import { NotificacionesInternasService } from './notificaciones-internas.service';
+import { hora12DeNaive } from '../../core/common/fecha-rd.util';
 import { EmpresaStatus, RoleKey, CitaStatus } from '@prisma/client';
 
 /**
@@ -146,7 +147,8 @@ export class AvisoPrevioCitaService {
                 Math.round((cita.inicio.getTime() - ahora.getTime()) / 60_000),
               );
               const servicios = cita.servicios.map((s) => s.servicio.nombre).join(' + ') || 'servicio';
-              const hora = this.hhmm(cita.inicio);
+              // Texto final (campana interna) -- en 12h, no "HH:mm".
+              const hora = hora12DeNaive(cita.inicio);
 
               await this.notifInternas.crear({
                 usuarioId: cita.empleado.usuarioId,
@@ -178,9 +180,5 @@ export class AvisoPrevioCitaService {
         return { avisos, descartadas };
       },
     );
-  }
-
-  private hhmm(d: Date): string {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 }
