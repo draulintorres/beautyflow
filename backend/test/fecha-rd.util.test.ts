@@ -16,6 +16,7 @@ import {
   ahoraNaiveRD,
   rangoDiaRDNaive,
   rangoDiaRD,
+  rangoFechasRDReal,
 } from '../src/core/common/fecha-rd.util';
 
 // ---------- rangoDiaRDReal: caso del bug original ----------
@@ -145,4 +146,38 @@ test('rangoDiaRD (alias deprecado) sigue funcionando igual que rangoDiaRDNaive',
   const r = rangoDiaRD('2026-11-21');
   assert.equal(r.inicio.toISOString(), '2026-11-21T00:00:00.000Z');
   assert.equal(r.fin.toISOString(), '2026-11-21T23:59:59.999Z');
+});
+
+// ---------- rangoFechasRDReal ----------
+
+test('rangoFechasRDReal: desde y hasta dan [gte, lt), "hasta" entra completo', () => {
+  const { gte, lt } = rangoFechasRDReal('2026-11-01', '2026-11-30');
+  assert.equal(gte!.toISOString(), '2026-11-01T04:00:00.000Z');
+  assert.equal(lt!.toISOString(), '2026-12-01T04:00:00.000Z'); // 1 ms después del último instante del 30
+
+  // Una venta del 30/11 a las 23:59 RD (03:59Z del 1/12) todavía entra.
+  const finDelHasta = new Date('2026-12-01T03:59:00.000Z');
+  assert.equal(finDelHasta.getTime() < lt!.getTime(), true);
+});
+
+test('rangoFechasRDReal: solo "desde" -- filtro abierto hacia adelante (sin lt)', () => {
+  const r = rangoFechasRDReal('2026-11-01', undefined);
+  assert.equal(r.gte!.toISOString(), '2026-11-01T04:00:00.000Z');
+  assert.equal('lt' in r, false);
+});
+
+test('rangoFechasRDReal: solo "hasta" -- filtro abierto hacia atrás (sin gte)', () => {
+  const r = rangoFechasRDReal(undefined, '2026-11-30');
+  assert.equal(r.lt!.toISOString(), '2026-12-01T04:00:00.000Z');
+  assert.equal('gte' in r, false);
+});
+
+test('rangoFechasRDReal: ninguno de los dos -- sin filtro ({})', () => {
+  assert.deepEqual(rangoFechasRDReal(undefined, undefined), {});
+});
+
+test('rangoFechasRDReal: entrada inválida da el mismo fallo que antes (Invalid Date -> RangeError al serializar), no lanza acá', () => {
+  const r = rangoFechasRDReal('no-es-una-fecha', undefined);
+  assert.equal(isNaN(r.gte!.getTime()), true);
+  assert.throws(() => r.gte!.toISOString(), RangeError);
 });

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { rangoDiaRDReal } from '../../core/common/fecha-rd.util';
 import {
   CreateVentaDto,
   AbonoDeudaDto,
@@ -946,10 +947,8 @@ export class VentasService {
 
     const where: Prisma.VentaWhereInput = {};
     if (filtros.fecha) {
-      where.createdAt = {
-        gte: new Date(`${filtros.fecha}T00:00:00`),
-        lte: new Date(`${filtros.fecha}T23:59:59.999`),
-      };
+      // Venta.createdAt es instante real -- rango semiabierto [gte, lt).
+      where.createdAt = rangoDiaRDReal(filtros.fecha);
     }
     if (filtros.estado) where.estado = filtros.estado;
     if (empleadoId) where.detalles = { some: { empleadoId } };

@@ -222,3 +222,28 @@ export function fechaHora12DeInstante(d: Date): string {
   const yyyy = naive.getUTCFullYear();
   return `${dd}/${mm}/${yyyy} ${formatearHora12(naive.getUTCHours(), naive.getUTCMinutes())}`;
 }
+
+/**
+ * [gte, lt) para un filtro "desde"/"hasta" (fechas-calendario RD
+ * "YYYY-MM-DD", ambas inclusivas) contra un campo que es INSTANTE REAL
+ * (createdAt, fechaCierre, etc.) -- NUNCA Cita.inicio/fin. `gte` sale del
+ * inicio real del día "desde"; `lt` del inicio real del día SIGUIENTE a
+ * "hasta" (para que el día "hasta" entre completo). Cualquiera de los dos
+ * puede faltar (filtro abierto de un solo lado); si ambos faltan, el
+ * resultado es `{}` (sin filtro).
+ *
+ * Entrada inválida: MISMO comportamiento que antes en cada sitio donde se
+ * usa esto -- no se valida ni se lanza acá. Una fecha con formato
+ * incorrecto da como resultado una Date inválida (igual que el
+ * `new Date(\`${fecha}T00:00:00\`)` que reemplaza), que falla más abajo al
+ * serializarse para Prisma (RangeError "Invalid time value" -- verificado
+ * que es el mismo punto de fallo en ambos casos). Donde el DTO ya valida
+ * con `@IsDateString()` (reportes), esto nunca llega a ejecutarse con un
+ * valor inválido.
+ */
+export function rangoFechasRDReal(desde?: string, hasta?: string): { gte?: Date; lt?: Date } {
+  return {
+    ...(desde && { gte: rangoDiaRDReal(desde).gte }),
+    ...(hasta && { lt: rangoDiaRDReal(hasta).lt }),
+  };
+}

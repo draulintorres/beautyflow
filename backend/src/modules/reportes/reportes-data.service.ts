@@ -12,7 +12,14 @@ import {
 import { ENUM_TO_ESTADO_ES } from '../agenda/dto/cita.dto';
 import { tenantContext, getEmpresaId } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
-import { fechaHoyRD, rangoDiaRD, hora12DeNaive, fechaHora12DeInstante } from '../../core/common/fecha-rd.util';
+import {
+  fechaHoyRD,
+  rangoDiaRD,
+  hora12DeNaive,
+  fechaHora12DeInstante,
+  fechaRDDeInstante,
+  rangoFechasRDReal,
+} from '../../core/common/fecha-rd.util';
 
 @Injectable()
 export class ReportesDataService {
@@ -61,7 +68,7 @@ export class ReportesDataService {
 
     const filas = ventas.map((v) => ({
       factura: `F${String(v.numero).padStart(7, '0')}`,
-      fecha: v.createdAt.toISOString().slice(0, 10),
+      fecha: fechaRDDeInstante(v.createdAt),
       cliente: v.cliente?.nombre ?? 'Walk-in',
       subtotal: Number(v.subtotal),
       itbis: Number(v.itbis),
@@ -98,7 +105,8 @@ export class ReportesDataService {
 
   // ---------- CITAS POR ESTADO ----------
   async citasPorEstado(q: ReporteQueryDto): Promise<ReporteTabular> {
-    const where = this.rangoFecha(q, 'inicio');
+    // Cita.inicio es naive -- NUNCA usar rangoFecha() (instante real) acá.
+    const where = this.rangoFechaNaive(q, 'inicio');
     const sucursalId = await this.sucursalEfectiva(q);
     const citas = await this.prisma.db.cita.findMany({
       where: {
@@ -384,7 +392,7 @@ export class ReportesDataService {
 
     const filas = ventas.map((v) => ({
       factura: `F${String(v.numero).padStart(7, '0')}`,
-      fecha: v.createdAt.toISOString().slice(0, 10),
+      fecha: fechaRDDeInstante(v.createdAt),
       cliente: v.cliente?.nombre ?? 'N/D',
       telefono: v.cliente?.whatsapp ?? v.cliente?.telefono ?? '',
       total: Number(v.total),
@@ -431,7 +439,7 @@ export class ReportesDataService {
     // Agrupar por día
     const porDia = new Map<string, { entradas: number; deInquilino: number }>();
     for (const p of pagos) {
-      const key = p.createdAt.toISOString().slice(0, 10);
+      const key = fechaRDDeInstante(p.createdAt);
       const cur = porDia.get(key) ?? { entradas: 0, deInquilino: 0 };
       cur.entradas = this.round(cur.entradas + Number(p.monto));
       if (esInquilinoPorCajaPorVenta.has(p.ventaId)) {
@@ -743,7 +751,18 @@ export class ReportesDataService {
   }
 
   // ---------- helpers ----------
+  /** Para campos que son INSTANTES REALES (createdAt, fechaCierre, etc.).
+   * NUNCA usar con Cita.inicio/fin -- ver rangoFechaNaive(). */
   private rangoFecha(q: ReporteQueryDto, campo: string) {
+    const rango = rangoFechasRDReal(q.desde, q.hasta);
+    if (!rango.gte && !rango.lt) return {};
+    return { [campo]: rango };
+  }
+
+  /** SOLO para Cita.inicio/fin (esquema naive) -- ej. citasPorEstado. Sin
+   * cambios de comportamiento respecto al rangoFecha() original -- no se
+   * toca ningún filtro de Cita.inicio/fin en esta ronda. */
+  private rangoFechaNaive(q: ReporteQueryDto, campo: string) {
     if (!q.desde && !q.hasta) return {};
     return {
       [campo]: {

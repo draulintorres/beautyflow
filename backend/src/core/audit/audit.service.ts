@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { getTenantStoreOrNull } from '../tenant/tenant-context';
+import { rangoFechasRDReal } from '../common/fecha-rd.util';
 
 export interface AuditEntry {
   modulo: string;
@@ -105,11 +106,9 @@ export class AuditService {
       ...(filtros.usuarioId && { usuarioId: filtros.usuarioId }),
       ...(filtros.entidad && { entidad: filtros.entidad }),
       ...(filtros.entidadId && { entidadId: filtros.entidadId }),
+      // AuditLog.createdAt es instante real -- rango semiabierto [gte, lt).
       ...((filtros.desde || filtros.hasta) && {
-        createdAt: {
-          ...(filtros.desde && { gte: new Date(`${filtros.desde}T00:00:00`) }),
-          ...(filtros.hasta && { lte: new Date(`${filtros.hasta}T23:59:59.999`) }),
-        },
+        createdAt: rangoFechasRDReal(filtros.desde, filtros.hasta),
       }),
     };
 
