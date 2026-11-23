@@ -13,6 +13,8 @@ import {
   CerrarCorteDto,
   ListarQueryDto,
 } from './dto/liquidacion.dto';
+import { esLineaDeArrastre } from './liquidaciones-rangos.util';
+import { rangoDiaRDReal } from '../../core/common/fecha-rd.util';
 
 @Injectable()
 export class LiquidacionesService {
@@ -36,11 +38,13 @@ export class LiquidacionesService {
   // ─── a. PREVIEW ──────────────────────────────────────────────────────────
   async preview(q: PreviewQueryDto) {
     const empresaId = getEmpresaId();
-    const hasta = q.hasta ? new Date(`${q.hasta}T23:59:59.999`) : new Date();
-    const desde = q.desde ? new Date(`${q.desde}T00:00:00`) : undefined;
+    // Venta.createdAt es instante real -- "hasta" (fecha-calendario RD)
+    // entra completo: createdAt < inicio real del día siguiente. Sin
+    // "hasta", el preview llega hasta ahora mismo (comportamiento previo).
+    const hastaInstante = q.hasta ? rangoDiaRDReal(q.hasta).lt : new Date();
     const sucursalId = await this.sucursalEfectiva(q.sucursalId);
 
-    // Líneas elegibles: PAGADA, con comision, sin liquidar, venta.createdAt <= hasta
+    // Líneas elegibles: PAGADA, con comision, sin liquidar, venta.createdAt < hastaInstante
     const lineas = await this.prisma.db.detalleVenta.findMany({
       where: {
         empleadoId: { not: null },
@@ -50,7 +54,7 @@ export class LiquidacionesService {
         venta: {
           empresaId,
           estado: VentaStatus.PAGADA,
-          createdAt: { lte: hasta },
+          createdAt: { lt: hastaInstante },
           ...(sucursalId && { sucursalId }),
         },
       },
@@ -105,7 +109,7 @@ export class LiquidacionesService {
 
     for (const l of lineas) {
       if (!l.empleadoId) continue;
-      const esArrastre = desde ? l.venta.createdAt < desde : false;
+      const esArrastre = esLineaDeArrastre(l.venta.createdAt, q.desde);
       const cur = porEmpleado.get(l.empleadoId) ?? {
         empleadoId: l.empleadoId,
         nombre: l.empleado?.nombre ?? 'N/D',
@@ -141,9 +145,17 @@ export class LiquidacionesService {
   async cerrarCorte(dto: CerrarCorteDto) {
     const empresaId = getEmpresaId();
     const user = getCurrentUser();
-    const periodoIni = new Date(`${dto.desde}T00:00:00`);
-    const periodoFin = new Date(`${dto.hasta}T23:59:59.999`);
+    // Fechas-calendario RD "naive" -- se GUARDAN y se MUESTRAN tal cual
+    // (periodoIni/periodoFin de LiquidacionComision), NO son instantes.
+    // "Z" explícita para que no dependan de la TZ del proceso.
+    const periodoIni = new Date(`${dto.desde}T00:00:00.000Z`);
+    const periodoFin = new Date(`${dto.hasta}T23:59:59.999Z`);
     const sucursalId = await this.sucursalEfectiva(dto.sucursalId);
+
+    // Elegibilidad: Venta.createdAt es instante real -- "hasta" entra
+    // completo (createdAt < inicio real del día siguiente). Sin cota
+    // inferior a propósito: lo viejo sin liquidar sigue arrastrando.
+    const hastaInstante = rangoDiaRDReal(dto.hasta).lt;
 
     const where: any = {
       empleadoId: { not: null },
@@ -152,7 +164,7 @@ export class LiquidacionesService {
       venta: {
         empresaId,
         estado: VentaStatus.PAGADA,
-        createdAt: { lte: periodoFin },
+        createdAt: { lt: hastaInstante },
         ...(sucursalId && { sucursalId }),
       },
     };
@@ -286,10 +298,13 @@ export class LiquidacionesService {
     if (q.empleadoId) where.empleadoId = q.empleadoId;
     if (q.pagada === 'true')  where.pagada = true;
     if (q.pagada === 'false') where.pagada = false;
+    // periodoIni/periodoFin son fechas-calendario naive (ver cerrarCorte) --
+    // comparación naive contra naive, ya coherente; solo se agrega "Z"
+    // explícita para no depender de la TZ del proceso.
     if (q.desde || q.hasta) {
       where.periodoIni = {};
-      if (q.desde) where.periodoIni.gte = new Date(`${q.desde}T00:00:00`);
-      if (q.hasta) where.periodoFin = { lte: new Date(`${q.hasta}T23:59:59.999`) };
+      if (q.desde) where.periodoIni.gte = new Date(`${q.desde}T00:00:00.000Z`);
+      if (q.hasta) where.periodoFin = { lte: new Date(`${q.hasta}T23:59:59.999Z`) };
     }
 
     const rows = await this.prisma.db.liquidacionComision.findMany({

@@ -782,6 +782,11 @@ export class VentasService {
       : [];
     const liquidacionPagada = liquidaciones.find((l) => l.pagada);
     if (liquidacionPagada) {
+      // periodoIni/periodoFin son fechas-calendario naive guardadas con
+      // "Z" explícita (ver liquidaciones.service.ts#cerrarCorte) -- su
+      // toISOString().slice(0,10) siempre reproduce exactamente los mismos
+      // dígitos "YYYY-MM-DD" que se usaron para construirlas, sin importar
+      // la TZ del proceso. Sigue correcto sin cambios.
       throw new BadRequestException(
         `Esta venta ya fue incluida en una liquidación de comisiones pagada ` +
         `(periodo ${liquidacionPagada.periodoIni.toISOString().slice(0, 10)} a ` +

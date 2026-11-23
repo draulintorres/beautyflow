@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
+import { fechaRDDeInstante, hora12DeInstante } from '../../core/common/fecha-rd.util';
 
 const C_DARK    = '#0a0a0b';
 const C_GOLD    = '#C9A24B';
@@ -23,23 +24,22 @@ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto'
 function fmtM(n: number): string {
   return `RD$ ${Number(n).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-function fmtDate(d: Date): string {
-  const dt = new Date(d);
-  return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+/** Instante REAL (Liquidacion.createdAt, Venta/DetalleVenta.createdAt,
+ * pagadaAt) -> "dd/mm/yyyy" en fecha-calendario RD. */
+function fmtFechaInstante(d: Date): string {
+  const [y, m, dia] = fechaRDDeInstante(d).split('-');
+  return `${dia}/${m}/${y}`;
+}
+/** periodoIni/periodoFin (fecha-calendario naive, NO instante) ->
+ * "dd/mm/yyyy" -- getUTC*, independiente de la TZ del proceso. */
+function fmtFechaNaive(d: Date): string {
+  return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
 }
 function fmtPeriodo(ini: Date, fin: Date): string {
-  const a = new Date(ini), b = new Date(fin);
-  if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()) {
-    return `${String(a.getDate()).padStart(2,'0')} – ${String(b.getDate()).padStart(2,'0')} de ${MESES[a.getMonth()]} ${a.getFullYear()}`;
+  if (ini.getUTCMonth() === fin.getUTCMonth() && ini.getUTCFullYear() === fin.getUTCFullYear()) {
+    return `${String(ini.getUTCDate()).padStart(2,'0')} – ${String(fin.getUTCDate()).padStart(2,'0')} de ${MESES[ini.getUTCMonth()]} ${ini.getUTCFullYear()}`;
   }
-  return `${fmtDate(ini)} – ${fmtDate(fin)}`;
-}
-function fmt12h(d: Date): string {
-  const dt = new Date(d);
-  let h = dt.getHours(), min = dt.getMinutes();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')} ${ampm}`;
+  return `${fmtFechaNaive(ini)} – ${fmtFechaNaive(fin)}`;
 }
 
 @Injectable()
@@ -114,7 +114,7 @@ export class LiquidacionesPdfService {
       const infoRows: [string, string][] = [
         ['Empleado', liq.empleado?.nombre ?? '—'],
         ['Período', fmtPeriodo(liq.periodoIni, liq.periodoFin)],
-        ['Fecha de emisión', `${fmtDate(liq.createdAt)}  ${fmt12h(liq.createdAt)}`],
+        ['Fecha de emisión', `${fmtFechaInstante(liq.createdAt)}  ${hora12DeInstante(liq.createdAt)}`],
       ];
       if (liq.creador?.nombre) infoRows.push(['Elaborado por', liq.creador.nombre]);
       if (liq.nota) infoRows.push(['Nota', liq.nota]);
@@ -153,7 +153,7 @@ export class LiquidacionesPdfService {
           const rh = 14;
           if (i % 2 === 1) doc.rect(M, y, CW, rh).fill(C_ROW_ALT);
 
-          const fechaStr = fmtDate(l.venta?.createdAt ?? l.createdAt);
+          const fechaStr = fmtFechaInstante(l.venta?.createdAt ?? l.createdAt);
           const factStr  = l.venta?.numero != null ? `F${String(l.venta.numero).padStart(7,'0')}` : '—';
           const descStr  = l.servicio?.nombre ?? l.descripcion ?? '—';
 
@@ -210,7 +210,7 @@ export class LiquidacionesPdfService {
       let estadoColor = '#b45309';
       if (esAnulada) { estadoStr = 'ANULADA'; estadoColor = '#7f1d1d'; }
       else if (esPagada) {
-        estadoStr = `PAGADA el ${fmtDate(liq.pagadaAt)}`;
+        estadoStr = `PAGADA el ${fmtFechaInstante(liq.pagadaAt)}`;
         estadoColor = '#166534';
       }
 
