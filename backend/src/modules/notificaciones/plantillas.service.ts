@@ -103,9 +103,12 @@ export class NotificacionesJobsService {
 
   /** Felicitaciones de cumpleaños: clientes que cumplen hoy. */
   async cumpleanos(): Promise<{ enviados: number }> {
-    const hoy = new Date();
-    const mes = hoy.getMonth() + 1;
-    const dia = hoy.getDate();
+    // Mes/día de "hoy" en RD -- directo del string, sin pasar por Date ni
+    // getters locales (antes usaba `new Date().getMonth()/getDate()`, que
+    // entre las 8pm y medianoche RD ya reflejaba el día siguiente en UTC).
+    const [, mesStr, diaStr] = fechaHoyRD().split('-');
+    const mes = Number(mesStr);
+    const dia = Number(diaStr);
 
     // Filtrar en memoria por mes/día (fechaNac es Date)
     const clientes = await this.prisma.db.cliente.findMany({
@@ -116,8 +119,9 @@ export class NotificacionesJobsService {
     let enviados = 0;
     for (const c of clientes) {
       if (!c.fechaNac) continue;
-      const f = new Date(c.fechaNac);
-      if (f.getMonth() + 1 === mes && f.getDate() === dia) {
+      // fechaNac es @db.Date (fecha-calendario pura, Postgres la guarda sin
+      // hora) -- leer con getUTC*, nunca con getters locales.
+      if (c.fechaNac.getUTCMonth() + 1 === mes && c.fechaNac.getUTCDate() === dia) {
         await this.notif.notificar({
           evento: NotificacionEvento.CUMPLEANOS,
           clienteId: c.id,
