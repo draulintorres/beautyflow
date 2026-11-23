@@ -7,14 +7,16 @@ import { AllExceptionsFilter } from './core/common/filters/all-exceptions.filter
 import { resolveTrustProxyHops } from './core/common/trust-proxy.util';
 import { parseAllowedOrigins } from './core/common/allowed-origins.util';
 import { validateJwtSecrets } from './core/common/jwt-secrets.util';
+import { validateProcessTimezone } from './core/common/process-timezone.util';
 
 async function bootstrap() {
-  // Ambas validaciones corren ANTES de crear la app (que ya conecta a la
-  // base de datos en su propio onModuleInit): un secreto de JWT faltante,
-  // vacío, corto o repetido en producción, o un TRUST_PROXY_HOPS
-  // inválido, deben tumbar el arranque sin depender de que la base esté
-  // disponible.
+  // Todas estas validaciones corren ANTES de crear la app (que ya conecta
+  // a la base de datos en su propio onModuleInit): un secreto de JWT
+  // faltante, vacío, corto o repetido en producción, un proceso que no
+  // esté en UTC (producción), o un TRUST_PROXY_HOPS inválido, deben
+  // tumbar el arranque sin depender de que la base esté disponible.
   validateJwtSecrets();
+  validateProcessTimezone();
   const trustProxyHops = resolveTrustProxyHops();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
