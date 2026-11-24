@@ -161,18 +161,21 @@ export class SuperAdminTotpService {
     this.asegurarNoBloqueado(rlKey, SuperAdminTotpService.ALTA_MAX, SuperAdminTotpService.ALTA_WINDOW_MS);
     this.rateLimiter.registrarFallo(rlKey, SuperAdminTotpService.ALTA_WINDOW_MS);
 
-    // Chequeado en la BASE (admin ya recargado arriba), no en el claim del
-    // challenge token.
-    if (admin.totpActivo) {
-      throw new ForbiddenException('El segundo factor ya está activo para esta cuenta.');
-    }
-
     const secreto = generarSecretoTotp();
     const cifrado = cifrarSecreto(secreto, admin.id, this.envTotp());
-    await this.prisma.superAdmin.update({
-      where: { id: admin.id },
+
+    // UNA sola operación: el chequeo de totpActivo y la escritura del
+    // secreto pendiente ocurren atómicamente en el propio UPDATE (condición
+    // en el WHERE), sin ventana entre leer y escribir -- dos solicitudes
+    // simultáneas nunca pueden pisarse creyendo ambas que el 2FA no estaba
+    // activo.
+    const escrito = await this.prisma.superAdmin.updateMany({
+      where: { id: admin.id, totpActivo: false },
       data: { totpSecretCifrado: cifrado },
     });
+    if (escrito.count !== 1) {
+      throw new ForbiddenException('El segundo factor ya está activo para esta cuenta.');
+    }
 
     const uri = construirUriTotp(secreto, admin.email);
     const qr = qrcode(0, 'M');
@@ -226,8 +229,14 @@ export class SuperAdminTotpService {
     const hashes = codigosRespaldo.map((c) => hashCodigoRespaldo(c));
 
     const activado = await this.prisma.$transaction(async (tx) => {
+      // Compare-and-swap: además de totpActivo=false, exige que
+      // totpSecretCifrado siga siendo el mismo valor que se leyó y verificó
+      // arriba. Si otra iniciarAlta corrió en el medio y reemplazó el
+      // secreto pendiente, este WHERE ya no matchea (count=0) y se rechaza
+      // en vez de activar con un secreto que no es el que se acaba de
+      // verificar.
       const resultadoUpdate = await tx.superAdmin.updateMany({
-        where: { id: admin.id, totpActivo: false },
+        where: { id: admin.id, totpActivo: false, totpSecretCifrado: admin.totpSecretCifrado },
         data: { totpActivo: true, totpUltimoPaso: resultado.paso },
       });
       if (resultadoUpdate.count !== 1) return false;

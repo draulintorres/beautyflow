@@ -58,6 +58,7 @@ export class SuperAdminController {
   @Post('login/totp/iniciar-alta')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   iniciarAltaTotp(@Body() dto: ChallengeTokenDto, @Req() req: Request) {
     return this.totp.iniciarAlta(dto.challengeToken, req.ip ?? 'desconocida');
   }
@@ -66,6 +67,7 @@ export class SuperAdminController {
   @Post('login/totp/confirmar-alta')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   confirmarAltaTotp(@Body() dto: ConfirmarAltaDto, @Req() req: Request) {
     return this.totp.confirmarAlta(dto.challengeToken, dto.codigo, req.ip ?? 'desconocida');
   }
@@ -74,6 +76,8 @@ export class SuperAdminController {
   @SaPublic()
   @Post('login/verificar-totp')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   verificarTotp(@Body() dto: VerificarTotpDto, @Req() req: Request) {
     return this.totp.verificarTotp(dto.challengeToken, dto.codigo, dto.codigoRespaldo, req.ip ?? 'desconocida');
   }

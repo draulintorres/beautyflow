@@ -7,12 +7,16 @@
  */
 import test from 'node:test';
 import * as assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { TOTP, NobleCryptoPlugin, ScureBase32Plugin, generateSync } from 'otplib';
+import { HEADERS_METADATA } from '@nestjs/common/constants.js';
 import { SuperAdminTotpService } from '../src/modules/superadmin/superadmin-totp.service';
+import { SuperAdminController } from '../src/modules/superadmin/superadmin.controller';
 import { SuperAdminService } from '../src/modules/superadmin/superadmin.service';
 import { SuperAdminGuard } from '../src/modules/superadmin/guards/superadmin.guard';
 import { RateLimiterService } from '../src/core/common/rate-limiter.service';
@@ -103,6 +107,7 @@ class FakeSuperAdminPrisma {
       const candidatos = [...this.admins.values()].filter((a) => {
         if (a.id !== where.id) return false;
         if (where.totpActivo !== undefined && a.totpActivo !== where.totpActivo) return false;
+        if (where.totpSecretCifrado !== undefined && a.totpSecretCifrado !== where.totpSecretCifrado) return false;
         if (where.OR) {
           const pasaOr = where.OR.some((cond: any) => {
             if (Object.prototype.hasOwnProperty.call(cond, 'totpUltimoPaso') && cond.totpUltimoPaso === null) {
@@ -438,4 +443,159 @@ test('verificar-totp: secreto TOTP indescifrable falla cerrado, pero un código 
   const challengeConRespaldo = totp.emitirChallenge('admin-1', 'verificar');
   const resultado = await totp.verificarTotp(challengeConRespaldo, undefined, codigosRespaldo[0], '1.2.3.4');
   assert.equal(typeof resultado.accessToken, 'string');
+});
+
+// ---------- ETAPA 10c, commit 3b ----------
+//
+// Las pruebas de una verdadera carrera a nivel de base (dos solicitudes
+// HTTP concurrentes, Promise.all contra Postgres real) están en la prueba
+// de humo del PASO 2, no acá: el Prisma falso de este archivo es código
+// síncrono en memoria -- un Promise.all sobre él nunca abre una ventana de
+// carrera real, así que "probarlo" acá sería fingir una concurrencia que
+// no existe. Lo que SÍ se puede probar con este Prisma falso es la lógica
+// de la condición atómica en sí (el WHERE de cada updateMany), que es lo
+// que de verdad impide la carrera cuando corre contra una base real.
+
+// ---------- (a) iniciarAlta: una sola operación atómica ----------
+
+test('iniciarAlta: si totpActivo ya es true, el updateMany atómico rechaza sin escribir ningún secreto (count 0)', async () => {
+  const prisma = new FakeSuperAdminPrisma();
+  prisma.crearAdmin({ id: 'admin-1', totpActivo: true });
+  const totp = makeServicio(prisma);
+  const challenge = totp.emitirChallenge('admin-1', 'alta');
+
+  await assert.rejects(() => totp.iniciarAlta(challenge, '1.2.3.4'), ForbiddenException);
+  // Nada se escribió: el secreto pendiente sigue null.
+  assert.equal(prisma.admins.get('admin-1')!.totpSecretCifrado, null);
+});
+
+test('iniciarAlta: de dos altas sucesivas para el mismo admin, solo la última queda vigente -- la primera ya no puede confirmarse', async () => {
+  const prisma = new FakeSuperAdminPrisma();
+  prisma.crearAdmin({ id: 'admin-1' });
+  const totp = makeServicio(prisma);
+
+  const challenge1 = totp.emitirChallenge('admin-1', 'alta');
+  const { secretoManual: secreto1 } = await totp.iniciarAlta(challenge1, '1.2.3.4');
+  const codigo1 = generarCodigoEnPaso(secreto1, pasoActual());
+
+  // Segunda alta (ej. el admin pidió un QR nuevo) pisa el secreto pendiente.
+  const challenge2 = totp.emitirChallenge('admin-1', 'alta');
+  const { secretoManual: secreto2 } = await totp.iniciarAlta(challenge2, '1.2.3.4');
+  assert.notEqual(secreto1, secreto2);
+
+  // El código de la PRIMERA alta ya no sirve: la base tiene el secreto de la segunda.
+  const challengeConfirmar1 = totp.emitirChallenge('admin-1', 'alta');
+  await assert.rejects(() => totp.confirmarAlta(challengeConfirmar1, codigo1, '1.2.3.4'), UnauthorizedException);
+
+  // El código de la SEGUNDA sí activa.
+  const codigo2 = generarCodigoEnPaso(secreto2, pasoActual());
+  const challengeConfirmar2 = totp.emitirChallenge('admin-1', 'alta');
+  const resultado = await totp.confirmarAlta(challengeConfirmar2, codigo2, '1.2.3.4');
+  assert.equal(typeof resultado.accessToken, 'string');
+});
+
+// ---------- (b) confirmarAlta: compare-and-swap sobre totpSecretCifrado ----------
+
+// Las dos pruebas de abajo parchan `updateMany` para simular, de forma
+// determinista, una escritura concurrente justo entre la verificación del
+// código (ya hecha, en memoria, con el secreto correcto) y el commit de la
+// activación -- el único punto donde el CAS (y no el chequeo temprano de
+// `admin.totpActivo` ni el descifrado) es lo que debe rechazar. Sin este
+// parche, un Prisma falso y síncrono nunca abre esa ventana por sí solo.
+
+test('confirmarAlta: CAS -- si totpSecretCifrado cambia justo antes del commit (otra iniciarAlta concurrente), rechaza aunque el código fuera válido', async () => {
+  const prisma = new FakeSuperAdminPrisma();
+  prisma.crearAdmin({ id: 'admin-1' });
+  const totp = makeServicio(prisma);
+
+  const challengeAlta = totp.emitirChallenge('admin-1', 'alta');
+  const { secretoManual } = await totp.iniciarAlta(challengeAlta, '1.2.3.4');
+  const codigo = generarCodigoEnPaso(secretoManual, pasoActual());
+
+  const original = prisma.superAdmin.updateMany.bind(prisma.superAdmin);
+  let parcheActivo = true;
+  (prisma.superAdmin as any).updateMany = async (args: any) => {
+    if (parcheActivo && args.data?.totpActivo === true) {
+      parcheActivo = false;
+      prisma.admins.get('admin-1')!.totpSecretCifrado = 'v1:b3RyYQ==:b3RyYQ==:b3RyYQ==';
+    }
+    return original(args);
+  };
+
+  const challengeConfirmar = totp.emitirChallenge('admin-1', 'alta');
+  await assert.rejects(() => totp.confirmarAlta(challengeConfirmar, codigo, '1.2.3.4'), ForbiddenException);
+
+  const fila = prisma.admins.get('admin-1')!;
+  assert.equal(fila.totpActivo, false);
+  assert.equal(prisma.codigos.length, 0);
+});
+
+test('confirmarAlta: código inválido no activa el 2FA (totpActivo sigue false y no se crean códigos de respaldo)', async () => {
+  const prisma = new FakeSuperAdminPrisma();
+  prisma.crearAdmin({ id: 'admin-1' });
+  const totp = makeServicio(prisma);
+
+  const challengeAlta = totp.emitirChallenge('admin-1', 'alta');
+  await totp.iniciarAlta(challengeAlta, '1.2.3.4');
+
+  const challengeConfirmar = totp.emitirChallenge('admin-1', 'alta');
+  await assert.rejects(() => totp.confirmarAlta(challengeConfirmar, '000000', '1.2.3.4'), UnauthorizedException);
+
+  const fila = prisma.admins.get('admin-1')!;
+  assert.equal(fila.totpActivo, false);
+  assert.equal(prisma.codigos.length, 0);
+});
+
+test('confirmarAlta: CAS -- si totpActivo se vuelve true justo antes del commit (otra confirmarAlta concurrente ganó), rechaza', async () => {
+  const prisma = new FakeSuperAdminPrisma();
+  prisma.crearAdmin({ id: 'admin-1' });
+  const totp = makeServicio(prisma);
+
+  const challengeAlta = totp.emitirChallenge('admin-1', 'alta');
+  const { secretoManual } = await totp.iniciarAlta(challengeAlta, '1.2.3.4');
+  const codigo = generarCodigoEnPaso(secretoManual, pasoActual());
+
+  // A diferencia de mutar totpActivo ANTES de llamar a confirmarAlta (lo
+  // que caería en el chequeo temprano de admin.totpActivo, no en el CAS),
+  // el parche lo cambia DESPUÉS de que esta llamada ya pasó ese chequeo y
+  // verificó el código -- justo antes de su propio updateMany de
+  // activación -- para aislar específicamente la condición del CAS.
+  const original = prisma.superAdmin.updateMany.bind(prisma.superAdmin);
+  let parcheActivo = true;
+  (prisma.superAdmin as any).updateMany = async (args: any) => {
+    if (parcheActivo && args.data?.totpActivo === true) {
+      parcheActivo = false;
+      prisma.admins.get('admin-1')!.totpActivo = true;
+    }
+    return original(args);
+  };
+
+  const challengeConfirmar = totp.emitirChallenge('admin-1', 'alta');
+  await assert.rejects(() => totp.confirmarAlta(challengeConfirmar, codigo, '1.2.3.4'), ForbiddenException);
+  assert.equal(prisma.codigos.length, 0);
+});
+
+// ---------- (c) cabeceras no-store en los 3 endpoints ----------
+
+test('cabeceras: iniciarAltaTotp, confirmarAltaTotp y verificarTotp declaran Cache-Control: no-store y Pragma: no-cache', () => {
+  const metodos = ['iniciarAltaTotp', 'confirmarAltaTotp', 'verificarTotp'] as const;
+  for (const metodo of metodos) {
+    const headers: Array<{ name: string; value: string }> =
+      Reflect.getMetadata(HEADERS_METADATA, (SuperAdminController.prototype as any)[metodo]) ?? [];
+    const cacheControl = headers.find((h) => h.name === 'Cache-Control');
+    const pragma = headers.find((h) => h.name === 'Pragma');
+    assert.equal(cacheControl?.value, 'no-store', `${metodo} debe declarar Cache-Control: no-store`);
+    assert.equal(pragma?.value, 'no-cache', `${metodo} debe declarar Pragma: no-cache`);
+  }
+});
+
+// ---------- (d) comentario del schema no debe mentir sobre el algoritmo ----------
+
+test('schema.prisma: el comentario de SuperAdminCodigoRespaldo.codigoHash dice SHA-256 (coherente con hashCodigoRespaldo)', () => {
+  const schema = readFileSync(join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+  const inicio = schema.indexOf('model SuperAdminCodigoRespaldo');
+  assert.notEqual(inicio, -1);
+  const bloque = schema.slice(Math.max(0, inicio - 200), inicio + 400);
+  assert.match(bloque, /SHA-256/);
+  assert.doesNotMatch(bloque, /bcrypt/i);
 });

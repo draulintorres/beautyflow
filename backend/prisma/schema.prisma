@@ -401,12 +401,12 @@ model SuperAdmin {
 }
 
 // Códigos de respaldo de un solo uso para el 2FA del SuperAdmin -- solo
-// se guarda el hash (bcrypt), nunca el código en claro.
+// se guarda el hash (SHA-256), nunca el código en claro.
 model SuperAdminCodigoRespaldo {
   id           String    @id @default(uuid()) @db.Uuid
   superAdminId String    @map("super_admin_id") @db.Uuid
   superAdmin   SuperAdmin @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
-  codigoHash   String    @map("codigo_hash")
+  codigoHash   String    @map("codigo_hash") // hash SHA-256, nunca en claro
   usadoEn      DateTime? @map("usado_en")
 
   createdAt DateTime @default(now()) @map("created_at")
