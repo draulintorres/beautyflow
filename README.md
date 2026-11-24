@@ -107,6 +107,44 @@ npx ts-node prisma/seed-superadmin.ts
 - `SUPERADMIN_SEED_NAME` — opcional, nombre que se muestra en el panel.
   Si no se define, usa "Estixa Admin".
 
+## Recuperar el acceso al panel de administración
+
+El login de SuperAdmin pide contraseña y un segundo factor (TOTP) obligatorio.
+Si el admin pierde el teléfono Y los 8 códigos de respaldo, queda sin forma
+de completar el login desde la propia app — hay que entrar por SSH al
+servidor y reiniciar el segundo factor con `backend/prisma/sa-reset-totp.ts`.
+Este script NO necesita la `TOTP_ENCRYPTION_KEY`: no descifra nada, solo
+borra el secreto cifrado y los códigos de respaldo de ese admin para que
+vuelva a enrolar desde cero.
+
+Pasos, por SSH en el servidor donde corre `docker-compose.yml`:
+
+```bash
+cd /ruta/al/proyecto   # donde está el docker-compose.yml en producción
+
+docker compose exec \
+  -e SA_RESET_EMAIL="admin@tu-dominio.com" \
+  -e SA_RESET_CONFIRM="RESET-TOTP:admin@tu-dominio.com" \
+  backend npx ts-node prisma/sa-reset-totp.ts
+```
+
+- `SA_RESET_EMAIL` — el correo del SuperAdmin a reiniciar.
+- `SA_RESET_CONFIRM` — debe ser EXACTAMENTE `RESET-TOTP:` seguido del mismo
+  correo de `SA_RESET_EMAIL`. Es la confirmación explícita de que se está
+  reiniciando a ESE admin en particular — si no coincide, el script no
+  toca nada y sale con error.
+- Si el correo no existe (o ya no tenía el segundo factor activo), el
+  script lo dice y no falla.
+
+**Inmediatamente después de correrlo**, el admin debe iniciar sesión (con
+su contraseña de siempre) y volver a registrar su app autenticadora — el
+login le va a pedir un QR nuevo automáticamente. **Mientras no lo haga,
+cualquiera que tenga la contraseña de esa cuenta podría registrar la suya
+en su lugar** — este reinicio deja la cuenta temporalmente sin segundo
+factor, igual que una cuenta nueva. Las sesiones que ya estaban activas
+antes del reinicio (hasta 8 horas) siguen siendo válidas; este script no
+las revoca.
+
 ## Qué NO vas a tener funcionando de entrada
 
 Esto es esperado, no son bugs:
