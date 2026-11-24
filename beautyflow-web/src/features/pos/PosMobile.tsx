@@ -181,6 +181,8 @@ export function PosMobile() {
       qc.invalidateQueries({ queryKey: ['caja-resumen'] });
       qc.invalidateQueries({ queryKey: ['citas'] });
       qc.invalidateQueries({ queryKey: ['facturas-hist'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-graficas'] });
       setTimeout(() => setToast(null), 4500);
     },
     onError: (e: unknown) => {
@@ -494,6 +496,8 @@ function HistorialSheet({ onClose }: { onClose: () => void }) {
       qc.invalidateQueries({ queryKey: ['caja-resumen'] });
       qc.invalidateQueries({ queryKey: ['citas'] });
       qc.invalidateQueries({ queryKey: ['inv-productos'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-graficas'] });
     },
     onError: (e: any) => {
       const msg = e?.response?.data?.message;
