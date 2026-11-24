@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { DisponibilidadService } from '../empleados/disponibilidad.service';
-import { rangoDiaRD } from '../../core/common/fecha-rd.util';
+import { rangoDiaRD, rangoDiaRDReal } from '../../core/common/fecha-rd.util';
 import {
   CreateCitaDto,
   RescheduleCitaDto,
@@ -342,7 +342,8 @@ export class AgendaService {
    *   propio empleadoId.
    */
   async ingresoHoy(fecha: string): Promise<number> {
-    const { inicio: dayStart, fin: dayEnd } = rangoDiaRD(fecha);
+    // Venta.createdAt es instante real -- rango semiabierto [gte, lt).
+    const { gte, lt } = rangoDiaRDReal(fecha);
 
     // Aislamiento por sucursal: si el usuario está limitado a una sucursal,
     // "Ingreso de hoy" cuenta solo las ventas de esa sucursal.
@@ -352,7 +353,7 @@ export class AgendaService {
       where: {
         ...suc,
         estado: VentaStatus.PAGADA,
-        createdAt: { gte: dayStart, lte: dayEnd },
+        createdAt: { gte, lt },
       },
       select: { total: true, detalles: { select: { empleadoId: true } } },
     });

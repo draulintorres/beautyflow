@@ -7,15 +7,18 @@ import { AllExceptionsFilter } from './core/common/filters/all-exceptions.filter
 import { resolveTrustProxyHops } from './core/common/trust-proxy.util';
 import { parseAllowedOrigins } from './core/common/allowed-origins.util';
 import { validateJwtSecrets } from './core/common/jwt-secrets.util';
+import { validateProcessTimezone } from './core/common/process-timezone.util';
 import { validateTotpEncryptionKey } from './core/common/totp-crypto.util';
 
 async function bootstrap() {
   // Todas estas validaciones corren ANTES de crear la app (que ya conecta
-  // a la base de datos en su propio onModuleInit): un secreto de JWT o de
-  // cifrado TOTP faltante, vacío, corto o repetido en producción, o un
-  // TRUST_PROXY_HOPS inválido, deben tumbar el arranque sin depender de
-  // que la base esté disponible.
+  // a la base de datos en su propio onModuleInit): un secreto de JWT
+  // faltante, vacío, corto o repetido en producción, un proceso que no
+  // esté en UTC (producción), una TOTP_ENCRYPTION_KEY faltante o con
+  // formato inválido, o un TRUST_PROXY_HOPS inválido, deben tumbar el
+  // arranque sin depender de que la base esté disponible.
   validateJwtSecrets();
+  validateProcessTimezone();
   validateTotpEncryptionKey();
   const trustProxyHops = resolveTrustProxyHops();
 

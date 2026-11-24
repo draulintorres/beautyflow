@@ -3,7 +3,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { NotificationService } from './notification.service';
 import { UpsertPlantillaDto, PLANTILLAS_DEFECTO } from './dto/notificacion.dto';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
-import { fechaHoyRD, rangoDiaRD } from '../../core/common/fecha-rd.util';
+import { fechaHoyRD, rangoDiaRD, hora12DeNaive } from '../../core/common/fecha-rd.util';
 import {
   NotificacionEvento,
   CanalNotificacion,
@@ -90,7 +90,8 @@ export class NotificacionesJobsService {
         clienteId: c.clienteId,
         variables: {
           fecha: c.inicio.toISOString().slice(0, 10),
-          hora: this.hhmm(c.inicio),
+          // Texto final (WhatsApp/correo al cliente) -- en 12h, no "HH:mm".
+          hora: hora12DeNaive(c.inicio),
         },
         referenciaTipo: 'CITA',
         referenciaId: c.id,
@@ -102,9 +103,12 @@ export class NotificacionesJobsService {
 
   /** Felicitaciones de cumpleaños: clientes que cumplen hoy. */
   async cumpleanos(): Promise<{ enviados: number }> {
-    const hoy = new Date();
-    const mes = hoy.getMonth() + 1;
-    const dia = hoy.getDate();
+    // Mes/día de "hoy" en RD -- directo del string, sin pasar por Date ni
+    // getters locales (antes usaba `new Date().getMonth()/getDate()`, que
+    // entre las 8pm y medianoche RD ya reflejaba el día siguiente en UTC).
+    const [, mesStr, diaStr] = fechaHoyRD().split('-');
+    const mes = Number(mesStr);
+    const dia = Number(diaStr);
 
     // Filtrar en memoria por mes/día (fechaNac es Date)
     const clientes = await this.prisma.db.cliente.findMany({
@@ -115,8 +119,9 @@ export class NotificacionesJobsService {
     let enviados = 0;
     for (const c of clientes) {
       if (!c.fechaNac) continue;
-      const f = new Date(c.fechaNac);
-      if (f.getMonth() + 1 === mes && f.getDate() === dia) {
+      // fechaNac es @db.Date (fecha-calendario pura, Postgres la guarda sin
+      // hora) -- leer con getUTC*, nunca con getters locales.
+      if (c.fechaNac.getUTCMonth() + 1 === mes && c.fechaNac.getUTCDate() === dia) {
         await this.notif.notificar({
           evento: NotificacionEvento.CUMPLEANOS,
           clienteId: c.id,
@@ -151,9 +156,5 @@ export class NotificacionesJobsService {
       enviados++;
     }
     return { enviados };
-  }
-
-  private hhmm(d: Date): string {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 }

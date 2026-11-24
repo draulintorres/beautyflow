@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, formatHora12 } from '../../lib/format';
 import styles from './CajaWidgets.module.css';
 
 export interface CajaAbierta {
@@ -23,7 +23,7 @@ export function useCajaEstado() {
 }
 
 function fmtHora(iso: string) {
-  return new Date(iso).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+  return formatHora12(iso);
 }
 
 /** Franja compacta de estado de caja + botón abrir/cerrar. Mismo componente

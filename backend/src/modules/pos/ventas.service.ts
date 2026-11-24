@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { rangoDiaRDReal } from '../../core/common/fecha-rd.util';
 import {
   CreateVentaDto,
   AbonoDeudaDto,
@@ -781,6 +782,11 @@ export class VentasService {
       : [];
     const liquidacionPagada = liquidaciones.find((l) => l.pagada);
     if (liquidacionPagada) {
+      // periodoIni/periodoFin son fechas-calendario naive guardadas con
+      // "Z" explícita (ver liquidaciones.service.ts#cerrarCorte) -- su
+      // toISOString().slice(0,10) siempre reproduce exactamente los mismos
+      // dígitos "YYYY-MM-DD" que se usaron para construirlas, sin importar
+      // la TZ del proceso. Sigue correcto sin cambios.
       throw new BadRequestException(
         `Esta venta ya fue incluida en una liquidación de comisiones pagada ` +
         `(periodo ${liquidacionPagada.periodoIni.toISOString().slice(0, 10)} a ` +
@@ -946,10 +952,8 @@ export class VentasService {
 
     const where: Prisma.VentaWhereInput = {};
     if (filtros.fecha) {
-      where.createdAt = {
-        gte: new Date(`${filtros.fecha}T00:00:00`),
-        lte: new Date(`${filtros.fecha}T23:59:59.999`),
-      };
+      // Venta.createdAt es instante real -- rango semiabierto [gte, lt).
+      where.createdAt = rangoDiaRDReal(filtros.fecha);
     }
     if (filtros.estado) where.estado = filtros.estado;
     if (empleadoId) where.detalles = { some: { empleadoId } };

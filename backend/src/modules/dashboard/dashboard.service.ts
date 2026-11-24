@@ -2,9 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
-import { fechaHoyRD, rangoDiaRD } from '../../core/common/fecha-rd.util';
+import {
+  fechaHoyRD,
+  fechaRDDeInstante,
+  mesRDDeInstante,
+  rangoDiaRDReal,
+} from '../../core/common/fecha-rd.util';
+import {
+  construirRangosDashboard,
+  rangoDesglosarMes,
+  rangoUltimos12Meses,
+  ESTADOS_EXCLUIDOS_METRICAS_VENTA,
+} from './dashboard-rangos.util';
 import {
   VentaStatus,
+  PagoStatus,
   CitaStatus,
   LineaTipo,
   ModeloPago,
@@ -99,7 +111,7 @@ export class DashboardService {
 
   // ============ KPIs ============
   async kpis(sucursalIdReq?: string) {
-    const { inicioHoy, finHoy, inicioMes, hace30Dias } = this.rangos();
+    const { diaReal, diaNaive, mesReal, hace30Dias } = this.rangos();
     const sucursalId = await this.scopeSucursalId(sucursalIdReq);
     const sucVenta = this.sucFilter(sucursalId);
     const sucCita = this.sucFilter(sucursalId);
@@ -112,30 +124,32 @@ export class DashboardService {
       cuentasPorCobrar,
       ticketAgg,
     ] = await Promise.all([
-      // Ventas de hoy (no anuladas, sin ventas de inquilinos)
+      // Ventas de hoy (no anuladas, sin ventas de inquilinos) -- instante
+      // real, rango semiabierto [gte, lt).
       this.prisma.db.venta.aggregate({
         where: {
           ...sucVenta,
           ...this.ventaSinInquilinos(),
-          createdAt: { gte: inicioHoy, lte: finHoy },
-          estado: { not: VentaStatus.ANULADA },
+          createdAt: { gte: diaReal.gte, lt: diaReal.lt },
+          estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
         },
         _sum: { total: true },
         _count: true,
       }),
-      // Ventas del mes (sin ventas de inquilinos)
+      // Ventas del mes (sin ventas de inquilinos) -- instante real, mes a
+      // la fecha (sin tope superior, igual que antes).
       this.prisma.db.venta.aggregate({
         where: {
           ...sucVenta,
           ...this.ventaSinInquilinos(),
-          createdAt: { gte: inicioMes },
-          estado: { not: VentaStatus.ANULADA },
+          createdAt: { gte: mesReal.gte },
+          estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
         },
         _sum: { total: true },
       }),
-      // Citas de hoy
+      // Citas de hoy -- Cita.inicio es naive, sigue con rangoDiaRDNaive.
       this.prisma.db.cita.count({
-        where: { ...sucCita, inicio: { gte: inicioHoy, lte: finHoy } },
+        where: { ...sucCita, inicio: { gte: diaNaive.inicio, lte: diaNaive.fin } },
       }),
       // Clientes nuevos (últimos 30 días). Cliente no tiene sucursal propia:
       // si la vista está aislada, se cuentan los que YA compraron en esa
@@ -159,8 +173,8 @@ export class DashboardService {
         where: {
           ...sucVenta,
           ...this.ventaSinInquilinos(),
-          createdAt: { gte: inicioMes },
-          estado: { not: VentaStatus.ANULADA },
+          createdAt: { gte: mesReal.gte },
+          estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
         },
         _avg: { total: true },
       }),
@@ -171,16 +185,17 @@ export class DashboardService {
 
     // Lo que los inquilinos le deben al dueño (DeudaAlquiler), sin contar
     // anuladas ni saldadas. Solo se muestra si hay al menos un inquilino.
-    const porCobrarInquilinos = await this.porCobrarInquilinos(sucursalId, inicioHoy, finHoy);
+    const porCobrarInquilinos = await this.porCobrarInquilinos(sucursalId, diaReal.gte, diaReal.lt);
     const alquilerMes =
       porCobrarInquilinos.inquilinos > 0
-        ? await this.alquilerDelMes(sucursalId, inicioMes)
+        ? await this.alquilerDelMes(sucursalId, mesReal.gte)
         : null;
 
     // % de ocupación de agenda hoy (citas activas vs capacidad estimada)
+    // -- Cita.inicio es naive, sigue con rangoDiaRDNaive.
     const ocupacion = await this.calcularOcupacionHoy(
-      inicioHoy,
-      finHoy,
+      diaNaive.inicio,
+      diaNaive.fin,
       sucursalId,
     );
 
@@ -236,8 +251,8 @@ export class DashboardService {
 
   private async porCobrarInquilinos(
     sucursalId: string | null,
-    inicioHoy: Date,
-    finHoy: Date,
+    gteHoy: Date,
+    ltHoy: Date,
   ): Promise<{ inquilinos: number; saldo: number; generadoHoy: number }> {
     const inquilinos = await this.prisma.db.empleado.count({
       where: {
@@ -257,11 +272,12 @@ export class DashboardService {
         },
         _sum: { saldo: true },
       }),
+      // DeudaAlquiler.createdAt es instante real -- rango semiabierto [gte, lt).
       this.prisma.db.deudaAlquiler.aggregate({
         where: {
           ...porSucursal,
           estado: { not: EstadoDeudaAlquiler.ANULADA },
-          createdAt: { gte: inicioHoy, lte: finHoy },
+          createdAt: { gte: gteHoy, lt: ltHoy },
         },
         _sum: { montoTotal: true },
       }),
@@ -287,7 +303,7 @@ export class DashboardService {
    * justamente la vista de comparación entre todas.
    */
   async porSucursal() {
-    const { inicioHoy, finHoy, inicioMes } = this.rangos();
+    const { diaReal, mesReal } = this.rangos();
 
     const sucursales = await this.prisma.db.sucursal.findMany({
       where: { activo: true },
@@ -302,8 +318,8 @@ export class DashboardService {
             where: {
               sucursalId: s.id,
               ...this.ventaSinInquilinos(),
-              createdAt: { gte: inicioHoy, lte: finHoy },
-              estado: { not: VentaStatus.ANULADA },
+              createdAt: { gte: diaReal.gte, lt: diaReal.lt },
+              estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
             },
             _sum: { total: true },
             _count: true,
@@ -312,8 +328,8 @@ export class DashboardService {
             where: {
               sucursalId: s.id,
               ...this.ventaSinInquilinos(),
-              createdAt: { gte: inicioMes },
-              estado: { not: VentaStatus.ANULADA },
+              createdAt: { gte: mesReal.gte },
+              estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
             },
             _sum: { total: true },
           }),
@@ -429,28 +445,25 @@ export class DashboardService {
     if (mes) {
       // Filtro "Enero".."Diciembre": un mes específico del `anio` elegido
       // (o el actual si no se eligió año) — desglose por día, no por mes,
-      // ya que un solo punto mensual no dice nada.
-      const anioMes = anio ?? new Date().getFullYear();
-      const desde = new Date(anioMes, mes - 1, 1);
-      const hasta = new Date(anioMes, mes, 1);
+      // ya que un solo punto mensual no dice nada. Venta.createdAt es
+      // instante real -- rango semiabierto [gte, lt).
+      const anioMes = anio ?? Number(fechaHoyRD().slice(0, 4));
+      const { gte, lt, clavesDias } = rangoDesglosarMes(anioMes, mes);
 
       const ventasDia = await this.prisma.db.venta.findMany({
         where: {
           ...this.sucFilter(sucursalId),
           ...this.ventaSinInquilinos(),
-          createdAt: { gte: desde, lt: hasta },
-          estado: { not: VentaStatus.ANULADA },
+          createdAt: { gte, lt },
+          estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
         },
         select: { createdAt: true, total: true },
       });
 
       const mapaDia = new Map<string, number>();
-      const diasEnMes = new Date(anioMes, mes, 0).getDate();
-      for (let dia = 1; dia <= diasEnMes; dia++) {
-        mapaDia.set(this.diaKey(new Date(anioMes, mes - 1, dia)), 0);
-      }
+      for (const clave of clavesDias) mapaDia.set(clave, 0);
       for (const v of ventasDia) {
-        const key = this.diaKey(v.createdAt);
+        const key = fechaRDDeInstante(v.createdAt);
         if (mapaDia.has(key)) {
           mapaDia.set(key, this.round(mapaDia.get(key)! + Number(v.total)));
         }
@@ -462,41 +475,26 @@ export class DashboardService {
       }));
     }
 
-    let desde: Date;
-    let hasta: Date | undefined;
-    if (anio) {
-      // "Año pasado" (o cualquier año calendario explícito): enero-diciembre
-      // completo de ese año, no una ventana móvil.
-      desde = new Date(anio, 0, 1);
-      hasta = new Date(anio + 1, 0, 1);
-    } else {
-      // Por defecto ("Este año" / sin selector): ventana móvil de los
-      // últimos 12 meses, comportamiento de siempre.
-      const base = new Date();
-      base.setMonth(base.getMonth() - 11);
-      const fechaDesde = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-01`;
-      desde = rangoDiaRD(fechaDesde).inicio;
-    }
+    // "Este año"/"Año pasado"/ventana móvil de 12 meses -- Venta.createdAt
+    // es instante real; `lt` solo viene presente con un año explícito
+    // (enero-diciembre cerrado), la ventana móvil por defecto queda
+    // abierta hasta ahora, igual que antes.
+    const { gte: desde, lt: hasta, clavesMeses } = rangoUltimos12Meses(fechaHoyRD(), anio);
 
     const ventas = await this.prisma.db.venta.findMany({
       where: {
         ...this.sucFilter(sucursalId),
         ...this.ventaSinInquilinos(),
         createdAt: { gte: desde, ...(hasta && { lt: hasta }) },
-        estado: { not: VentaStatus.ANULADA },
+        estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
       },
       select: { createdAt: true, total: true },
     });
 
-    // Agrupar por mes (YYYY-MM)
     const mapa = new Map<string, number>();
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(desde);
-      d.setMonth(desde.getMonth() + i);
-      mapa.set(this.mesKey(d), 0);
-    }
+    for (const clave of clavesMeses) mapa.set(clave, 0);
     for (const v of ventas) {
-      const key = this.mesKey(v.createdAt);
+      const key = mesRDDeInstante(v.createdAt);
       if (mapa.has(key)) {
         mapa.set(key, this.round(mapa.get(key)! + Number(v.total)));
       }
@@ -511,7 +509,7 @@ export class DashboardService {
       where: {
         ...this.sucFilter(sucursalId),
         ...this.ventaSinInquilinos(),
-        estado: { not: VentaStatus.ANULADA },
+        estado: { notIn: ESTADOS_EXCLUIDOS_METRICAS_VENTA },
       },
       _sum: { total: true },
       _count: true,
@@ -574,11 +572,24 @@ export class DashboardService {
     return resultados;
   }
 
+  /**
+   * Commit 8 (NO zona horaria): mismo hueco que flujoCajaUltimos30Dias()
+   * antes del commit 7 -- no filtraba por estado en absoluto, así que
+   * sumaba pagos de ventas ANULADAS como si fueran cobros reales. anular()
+   * nunca marca sus Pago como REFUNDED, así que sin este filtro quedaban
+   * contados para siempre en la tarjeta "Formas de pago" del dashboard.
+   */
   private async formasDePago(sucursalId: string | null) {
+    const sucVenta = this.sucFilterViaVenta(sucursalId);
     const grupos = await this.prisma.db.pago.groupBy({
       by: ['metodoPagoId'],
       where: {
-        venta: { ...this.sucFilterViaVenta(sucursalId).venta, ...this.ventaSinInquilinos() },
+        estado: PagoStatus.CONFIRMED,
+        venta: {
+          ...sucVenta.venta,
+          ...this.ventaSinInquilinos(),
+          estado: { not: VentaStatus.ANULADA },
+        },
       } as Prisma.PagoWhereInput,
       _sum: { monto: true },
       _count: true,
@@ -595,24 +606,32 @@ export class DashboardService {
     }));
   }
 
-  /** Flujo de caja: entradas (pagos) por día en los últimos 30 días. */
+  /** Flujo de caja: entradas (pagos) por día en los últimos 30 días.
+   * Pago.createdAt es instante real -- fecha de corte y llave del mapa
+   * con fechaRDDeInstante, no con toISOString()/getters locales.
+   *
+   * Commit 7 (NO zona horaria): no filtraba por estado en absoluto --
+   * sumaba pagos de ventas ANULADAS (y de OPEN) como si fueran entradas
+   * reales de caja. anular() nunca marca sus Pago como REFUNDED, así que
+   * sin excluir por venta.estado esos pagos quedaban contados para siempre.
+   */
   private async flujoCajaUltimos30Dias(sucursalId: string | null) {
-    const hace30DiasFecha = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-    const desde = rangoDiaRD(hace30DiasFecha).inicio;
+    const haceTreintaDias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const desde = rangoDiaRDReal(fechaRDDeInstante(haceTreintaDias)).gte;
 
+    const sucVenta = this.sucFilterViaVenta(sucursalId);
     const pagos = await this.prisma.db.pago.findMany({
       where: {
         createdAt: { gte: desde },
-        ...(this.sucFilterViaVenta(sucursalId) as Prisma.PagoWhereInput),
-      },
+        estado: PagoStatus.CONFIRMED,
+        venta: { ...sucVenta.venta, estado: { not: VentaStatus.ANULADA } },
+      } as Prisma.PagoWhereInput,
       select: { createdAt: true, monto: true },
     });
 
     const mapa = new Map<string, number>();
     for (const p of pagos) {
-      const key = p.createdAt.toISOString().slice(0, 10);
+      const key = fechaRDDeInstante(p.createdAt);
       mapa.set(key, this.round((mapa.get(key) ?? 0) + Number(p.monto)));
     }
 
@@ -797,22 +816,16 @@ export class DashboardService {
     return Math.min(100, this.round((citasActivas / capacidad) * 100));
   }
 
+  /**
+   * Dos rangos de "hoy" distintos a propósito -- ver fecha-rd.util.ts:
+   * `diaReal`/`mesReal` ({gte, lt}, semiabiertos) son para campos que son
+   * INSTANTES REALES (Venta.createdAt, DeudaAlquiler.createdAt, etc.);
+   * `diaNaive` ({inicio, fin}) es SOLO para Cita.inicio/fin (esquema
+   * naive). Mezclarlos es el bug que esto reemplaza -- ver investigación
+   * de zona horaria.
+   */
   private rangos() {
-    const hoy = fechaHoyRD();
-    const { inicio: inicioHoy, fin: finHoy } = rangoDiaRD(hoy);
-    const [anio, mes] = hoy.split('-').map(Number);
-    const primerDiaMes = `${anio}-${String(mes).padStart(2, '0')}-01`;
-    const inicioMes = rangoDiaRD(primerDiaMes).inicio;
-    const hace30Dias = new Date(inicioHoy.getTime() - 30 * 24 * 60 * 60 * 1000);
-    return { inicioHoy, finHoy, inicioMes, hace30Dias };
-  }
-
-  private mesKey(d: Date): string {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }
-
-  private diaKey(d: Date): string {
-    return `${this.mesKey(d)}-${String(d.getDate()).padStart(2, '0')}`;
+    return construirRangosDashboard(fechaHoyRD());
   }
 
   private round(n: number): number {

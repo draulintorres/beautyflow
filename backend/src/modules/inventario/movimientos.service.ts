@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AjusteInventarioDto, TransferenciaDto } from './dto/inventario.dto';
+import { rangoFechasRDReal } from '../../core/common/fecha-rd.util';
 import { getEmpresaId, getCurrentUser } from '../../core/tenant/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
 import { MovimientoInventarioTipo, Prisma } from '@prisma/client';
@@ -27,13 +28,10 @@ export class MovimientosService {
     const movimientos = await this.prisma.db.movimientoInventario.findMany({
       where: {
         productoId,
+        // MovimientoInventario.createdAt es instante real -- rango
+        // semiabierto [gte, lt).
         ...(filtros.desde || filtros.hasta
-          ? {
-              createdAt: {
-                ...(filtros.desde && { gte: new Date(`${filtros.desde}T00:00:00`) }),
-                ...(filtros.hasta && { lte: new Date(`${filtros.hasta}T23:59:59.999`) }),
-              },
-            }
+          ? { createdAt: rangoFechasRDReal(filtros.desde, filtros.hasta) }
           : {}),
       },
       orderBy: { createdAt: 'asc' },

@@ -8,6 +8,7 @@ import { getEmpresaId } from '../../core/tenant/tenant-context';
 import { AgendaService } from '../agenda/agenda.service';
 import { DisponibilidadService } from '../empleados/disponibilidad.service';
 import { PortalReservarDto } from './dto/portal.dto';
+import { hora12DeNaive } from '../../core/common/fecha-rd.util';
 import {
   VentaStatus,
   CitaStatus,
@@ -79,7 +80,8 @@ export class PortalService {
         ? {
             id: proximaCita.id,
             fecha: proximaCita.inicio.toISOString().slice(0, 10),
-            hora: this.hhmm(proximaCita.inicio),
+            // Texto final del portal (sin conversor propio en el frontend) -- en 12h.
+            hora: hora12DeNaive(proximaCita.inicio),
             empleado: proximaCita.empleado?.nombre,
             servicios: proximaCita.servicios.map((s) => s.servicio?.nombre),
             estado: ENUM_TO_ESTADO_ES[proximaCita.estado as CitaStatus],
@@ -108,7 +110,7 @@ export class PortalService {
     return citas.map((c) => ({
       id: c.id,
       fecha: c.inicio.toISOString().slice(0, 10),
-      hora: this.hhmm(c.inicio),
+      hora: hora12DeNaive(c.inicio),
       empleado: c.empleado?.nombre,
       servicios: c.servicios.map((s) => s.servicio?.nombre),
       estado: ENUM_TO_ESTADO_ES[c.estado as CitaStatus],
@@ -266,9 +268,5 @@ export class PortalService {
     if (cita.clienteId !== clienteId) {
       throw new ForbiddenException('No puedes modificar esta cita');
     }
-  }
-
-  private hhmm(d: Date): string {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 }

@@ -3,6 +3,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { ReporteQueryDto, ReporteTabular } from './dto/reporte.dto';
 import {
   VentaStatus,
+  PagoStatus,
   CitaStatus,
   ModeloPago,
   FlujoDineroAlquiler,
@@ -12,7 +13,14 @@ import {
 import { ENUM_TO_ESTADO_ES } from '../agenda/dto/cita.dto';
 import { tenantContext, getEmpresaId } from '../../core/tenant/tenant-context';
 import { SucursalScopeService } from '../../core/tenant/sucursal-scope.service';
-import { fechaHoyRD, rangoDiaRD } from '../../core/common/fecha-rd.util';
+import {
+  fechaHoyRD,
+  rangoDiaRD,
+  hora12DeNaive,
+  fechaHora12DeInstante,
+  fechaRDDeInstante,
+  rangoFechasRDReal,
+} from '../../core/common/fecha-rd.util';
 
 @Injectable()
 export class ReportesDataService {
@@ -61,7 +69,7 @@ export class ReportesDataService {
 
     const filas = ventas.map((v) => ({
       factura: `F${String(v.numero).padStart(7, '0')}`,
-      fecha: v.createdAt.toISOString().slice(0, 10),
+      fecha: fechaRDDeInstante(v.createdAt),
       cliente: v.cliente?.nombre ?? 'Walk-in',
       subtotal: Number(v.subtotal),
       itbis: Number(v.itbis),
@@ -98,7 +106,8 @@ export class ReportesDataService {
 
   // ---------- CITAS POR ESTADO ----------
   async citasPorEstado(q: ReporteQueryDto): Promise<ReporteTabular> {
-    const where = this.rangoFecha(q, 'inicio');
+    // Cita.inicio es naive -- NUNCA usar rangoFecha() (instante real) acá.
+    const where = this.rangoFechaNaive(q, 'inicio');
     const sucursalId = await this.sucursalEfectiva(q);
     const citas = await this.prisma.db.cita.findMany({
       where: {
@@ -115,7 +124,7 @@ export class ReportesDataService {
 
     const filas = citas.map((c) => ({
       fecha: c.inicio.toISOString().slice(0, 10),
-      hora: this.hhmm(c.inicio),
+      hora: hora12DeNaive(c.inicio),
       cliente: c.cliente?.nombre ?? 'N/D',
       empleado: c.empleado?.nombre ?? 'N/D',
       estado: ENUM_TO_ESTADO_ES[c.estado as CitaStatus],
@@ -346,7 +355,7 @@ export class ReportesDataService {
     });
 
     const filas = movimientos.map((m) => ({
-      fecha: m.createdAt.toISOString().slice(0, 16).replace('T', ' '),
+      fecha: fechaHora12DeInstante(m.createdAt),
       tipo: m.tipo,
       motivo: m.motivo ?? '',
       cantidad: m.cantidad,
@@ -384,7 +393,7 @@ export class ReportesDataService {
 
     const filas = ventas.map((v) => ({
       factura: `F${String(v.numero).padStart(7, '0')}`,
-      fecha: v.createdAt.toISOString().slice(0, 10),
+      fecha: fechaRDDeInstante(v.createdAt),
       cliente: v.cliente?.nombre ?? 'N/D',
       telefono: v.cliente?.whatsapp ?? v.cliente?.telefono ?? '',
       total: Number(v.total),
@@ -410,13 +419,20 @@ export class ReportesDataService {
   }
 
   // ---------- FLUJO DE CAJA ----------
+  /**
+   * Commit 7 (NO zona horaria): no filtraba por estado en absoluto -- sumaba
+   * pagos de ventas ANULADAS como entradas reales. anular() nunca marca sus
+   * Pago como REFUNDED, así que sin excluir por venta.estado quedaban
+   * contados para siempre; se exige además Pago.estado = CONFIRMED.
+   */
   async flujoCaja(q: ReporteQueryDto): Promise<ReporteTabular> {
     const where = this.rangoFecha(q, 'createdAt');
     const sucursalId = await this.sucursalEfectiva(q);
     const pagos = await this.prisma.db.pago.findMany({
       where: {
         ...where,
-        venta: this.ventaFiltro(sucursalId),
+        estado: PagoStatus.CONFIRMED,
+        venta: { ...this.ventaFiltro(sucursalId), estado: { not: VentaStatus.ANULADA } },
       },
       include: { metodoPago: { select: { nombre: true } } },
     });
@@ -431,7 +447,7 @@ export class ReportesDataService {
     // Agrupar por día
     const porDia = new Map<string, { entradas: number; deInquilino: number }>();
     for (const p of pagos) {
-      const key = p.createdAt.toISOString().slice(0, 10);
+      const key = fechaRDDeInstante(p.createdAt);
       const cur = porDia.get(key) ?? { entradas: 0, deInquilino: 0 };
       cur.entradas = this.round(cur.entradas + Number(p.monto));
       if (esInquilinoPorCajaPorVenta.has(p.ventaId)) {
@@ -690,7 +706,7 @@ export class ReportesDataService {
     });
 
     const filas = citas.map((c) => ({
-      hora: this.hhmm(c.inicio),
+      hora: hora12DeNaive(c.inicio),
       cliente: c.cliente?.nombre ?? 'N/D',
       empleado: c.empleado?.nombre ?? 'N/D',
       servicios: c.servicios.map((s) => s.servicio?.nombre).join(', '),
@@ -743,7 +759,18 @@ export class ReportesDataService {
   }
 
   // ---------- helpers ----------
+  /** Para campos que son INSTANTES REALES (createdAt, fechaCierre, etc.).
+   * NUNCA usar con Cita.inicio/fin -- ver rangoFechaNaive(). */
   private rangoFecha(q: ReporteQueryDto, campo: string) {
+    const rango = rangoFechasRDReal(q.desde, q.hasta);
+    if (!rango.gte && !rango.lt) return {};
+    return { [campo]: rango };
+  }
+
+  /** SOLO para Cita.inicio/fin (esquema naive) -- ej. citasPorEstado. Sin
+   * cambios de comportamiento respecto al rangoFecha() original -- no se
+   * toca ningún filtro de Cita.inicio/fin en esta ronda. */
+  private rangoFechaNaive(q: ReporteQueryDto, campo: string) {
     if (!q.desde && !q.hasta) return {};
     return {
       [campo]: {
@@ -760,21 +787,16 @@ export class ReportesDataService {
     return 'Todo el período';
   }
 
-  private hhmm(d: Date): string {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-
   /**
-   * Fecha + hora legible ("11/09/2026 14:12"). Se usa en vez de `tipo:
-   * 'fecha'` (que en el frontend de Reportes espera un string ya formateado
-   * tipo YYYY-MM-DD, sin hora) porque en Cortes de Caja la hora sí importa
-   * — puede haber más de una sesión el mismo día en la misma caja.
+   * Fecha + hora legible en RD, 12h ("21/11/2026 8:25 PM"). Se usa en vez
+   * de `tipo: 'fecha'` (que en el frontend de Reportes espera un string ya
+   * formateado tipo YYYY-MM-DD, sin hora) porque en Cortes de Caja la hora
+   * sí importa — puede haber más de una sesión el mismo día en la misma
+   * caja. `d` es un INSTANTE REAL (AperturaCaja.fechaCierre), no naive.
    */
   private fechaHora(d: Date | null): string {
     if (!d) return '—';
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    return `${dd}/${mm}/${d.getFullYear()} ${this.hhmm(d)}`;
+    return fechaHora12DeInstante(d);
   }
 
   private round(n: number): number {

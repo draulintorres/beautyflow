@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { ReporteTabular } from './dto/reporte.dto';
+import { fechaHora12DeInstante } from '../../core/common/fecha-rd.util';
 
 export interface ArchivoExportado {
   buffer: Buffer;
@@ -390,14 +391,10 @@ export class ExportService {
       if (rep.empresa?.rnc)      infoLines.push(`RNC: ${rep.empresa.rnc}`);
       if (rep.subtitulo)         infoLines.push(`Período: ${rep.subtitulo.split('·')[0].trim()}`);
 
-      const now = new Date();
-      const fechaGen = now.toLocaleDateString('es-DO', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-      });
-      const horaGen = now.toLocaleTimeString('es-DO', {
-        hour: '2-digit', minute: '2-digit',
-      });
-      infoLines.push(`Generado: ${fechaGen}  ${horaGen}`);
+      // fechaHora12DeInstante ya da fecha+hora en RD (12h) a partir de un
+      // instante real -- reemplaza el toLocaleDateString/toLocaleTimeString
+      // anterior, que imprimía la fecha/hora en UTC (TZ del proceso).
+      infoLines.push(`Generado: ${fechaHora12DeInstante(new Date())}`);
       if (rep.generadoPor) infoLines.push(`Generado por: ${rep.generadoPor}`);
 
       const INFO_W = 220;

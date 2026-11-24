@@ -197,6 +197,9 @@ function CobroModal({
     onSuccess: (ventaActualizada: any) => {
       qc.invalidateQueries({ queryKey: ['cxc'] });
       qc.invalidateQueries({ queryKey: ['factura-detalle', venta.id] });
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-graficas'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-rankings'] });
       const pagos: PagoHistorial[] = ventaActualizada?.pagos ?? [];
       const ultimoPago = pagos[pagos.length - 1];
       onSuccess(montoNum, nuevoSaldo, ultimoPago?.id ?? null);
@@ -707,6 +710,9 @@ function AbonoAlquilerModal({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['alquiler-deudas'] });
       qc.invalidateQueries({ queryKey: ['alquiler-deuda-detalle', deuda.id] });
+      qc.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-graficas'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-rankings'] });
       onSuccess(montoNum, nuevoSaldo);
     },
     onError: (e) => { setErr(errMsg(e)); setConfirmando(false); },

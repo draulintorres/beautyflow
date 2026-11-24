@@ -3,6 +3,12 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantContext } from '../../core/tenant/tenant-context';
 import { NotificacionesInternasService } from './notificaciones-internas.service';
+import { hora12DeNaive } from '../../core/common/fecha-rd.util';
+import {
+  ventanaAvisoPrevio,
+  umbralCitaPasada,
+  minutosHastaLaCita,
+} from './aviso-previo-rangos.util';
 import { EmpresaStatus, RoleKey, CitaStatus } from '@prisma/client';
 
 /**
@@ -103,26 +109,31 @@ export class AvisoPrevioCitaService {
         // antes" ya no tiene sentido si el cron estuvo caído o se retrasó.
         // Se marcan (sin notificar) para que no reaparezcan en corridas
         // futuras — decisión explícita de la Fase 3.
+        //
+        // Cita.inicio es naive -- comparar contra `ahora` (instante real)
+        // directo desalineaba el corte 4 horas (ver investigación de zona
+        // horaria). umbralCitaPasada() convierte `ahora` a su equivalente
+        // naive antes de comparar.
         const { count: descartadas } = await this.prisma.db.cita.updateMany({
           where: {
             estado: { in: ESTADOS_ELEGIBLES },
             avisoPrevioEnviadoAt: null,
-            inicio: { lt: ahora },
+            inicio: { lt: umbralCitaPasada(ahora) },
           },
           data: { avisoPrevioEnviadoAt: ahora },
         });
 
-        // Ventana normal (cron real): [ahora+minutosAvisoCita, ahora+minutosAvisoCita+5min).
-        // Modo dev ignorarVentana: sin cota superior NI inferior atada a
-        // minutosAvisoCita — toma cualquier cita futura elegible, para no
-        // depender de que el dev cronometre la creación de datos de prueba
-        // al segundo exacto en que corre el barrido.
-        const inicioVentana = opts.respetarVentana
-          ? new Date(ahora.getTime() + minutosAvisoCita * 60_000)
-          : ahora;
-        const finVentana = opts.respetarVentana
-          ? new Date(inicioVentana.getTime() + INTERVALO_CRON_MIN * 60_000)
-          : undefined;
+        // Ventana de búsqueda en el esquema naive (ver
+        // aviso-previo-rangos.util.ts) -- antes se armaba con `ahora`
+        // (instante real) y se comparaba directo contra Cita.inicio
+        // (naive), lo que disparaba el aviso ~4 horas antes de lo
+        // configurado en vez de a los minutosAvisoCita reales.
+        const { gte: inicioVentana, lt: finVentana } = ventanaAvisoPrevio(
+          ahora,
+          minutosAvisoCita,
+          INTERVALO_CRON_MIN,
+          opts.respetarVentana,
+        );
 
         const citas = await this.prisma.db.cita.findMany({
           where: {
@@ -141,12 +152,10 @@ export class AvisoPrevioCitaService {
         for (const cita of citas) {
           try {
             if (cita.empleado.usuarioId) {
-              const minutosReales = Math.max(
-                0,
-                Math.round((cita.inicio.getTime() - ahora.getTime()) / 60_000),
-              );
+              const minutosReales = minutosHastaLaCita(cita.inicio, ahora);
               const servicios = cita.servicios.map((s) => s.servicio.nombre).join(' + ') || 'servicio';
-              const hora = this.hhmm(cita.inicio);
+              // Texto final (campana interna) -- en 12h, no "HH:mm".
+              const hora = hora12DeNaive(cita.inicio);
 
               await this.notifInternas.crear({
                 usuarioId: cita.empleado.usuarioId,
@@ -178,9 +187,5 @@ export class AvisoPrevioCitaService {
         return { avisos, descartadas };
       },
     );
-  }
-
-  private hhmm(d: Date): string {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 }

@@ -4,6 +4,7 @@ import { join } from 'path';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { getEmpresaId } from '../../core/tenant/tenant-context';
 import { InquilinoService } from '../../core/auth/inquilino.service';
+import { fechaRDDeInstante } from '../../core/common/fecha-rd.util';
 
 // Brand constants (same as ExportService)
 const C_DARK    = '#0a0a0b';
@@ -120,8 +121,13 @@ export class FacturaReciboService {
     const logo = this.logoBuffer;
     const fmtM = (n: number) =>
       `RD$ ${Number(n).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const fmtDate = (d: Date) =>
-      new Date(d).toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    // venta.createdAt es instante real -- fecha-calendario RD, no la del
+    // proceso (TZ=UTC haría que una venta de las 8pm+ RD imprimiera el
+    // día siguiente).
+    const fmtDate = (d: Date) => {
+      const [y, m, dia] = fechaRDDeInstante(d).split('-');
+      return `${dia}/${m}/${y}`;
+    };
 
     return new Promise<Buffer>((resolve) => {
       const doc = new PDFDocument({
@@ -281,8 +287,11 @@ export class FacturaReciboService {
     const logo = this.logoBuffer;
     const fmtM = (n: number) =>
       `RD$ ${Number(n).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const fmtDate = (d: Date) =>
-      new Date(d).toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    // pago.createdAt es instante real -- fecha-calendario RD, no la del proceso.
+    const fmtDate = (d: Date) => {
+      const [y, m, dia] = fechaRDDeInstante(d).split('-');
+      return `${dia}/${m}/${y}`;
+    };
 
     return new Promise<Buffer>((resolve) => {
       const doc = new PDFDocument({

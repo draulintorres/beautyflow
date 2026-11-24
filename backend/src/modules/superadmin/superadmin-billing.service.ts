@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { EmailService } from '../../core/email/email.service';
 import { RegistrarPagoSaaSDto } from './dto/superadmin.dto';
+import { fechaRDDeInstante } from '../../core/common/fecha-rd.util';
 import {
   EmpresaStatus,
   SubStatus,
@@ -98,9 +99,14 @@ export class SuperAdminBillingService {
       maximumFractionDigits: 2,
     });
     const vencida = factura.status === FacturaSaaSStatus.VENCIDA;
-    const vencimientoTexto = factura.fechaVencimiento.toLocaleDateString('es-DO', {
-      day: 'numeric', month: 'long', year: 'numeric',
-    });
+    // fechaVencimiento es DateTime SIN @db.Date -- un instante real
+    // (new Date() + 10 días, con la hora exacta en que se generó la
+    // factura, nunca normalizada a medianoche). toLocaleDateString sin
+    // timeZone usaba la del proceso (TZ=UTC) -- si el cron generador
+    // corre entre 00:00 y 03:59 UTC (20:00-23:59 RD del día anterior),
+    // mostraba un día de vencimiento adelantado respecto al calendario RD.
+    const [vY, vM, vD] = fechaRDDeInstante(factura.fechaVencimiento).split('-').map(Number);
+    const vencimientoTexto = `${vD} de ${MESES[vM - 1]} de ${vY}`;
     const loginUrl = `${this.frontendUrl}/login`;
     // Mismo número de soporte que ya usa el frontend (lib/soporte.ts) —
     // no se puede reusar ese helper acá (es del bundle del frontend), así
