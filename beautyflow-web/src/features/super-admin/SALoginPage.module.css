@@ -220,6 +220,113 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Verificación en dos pasos (código / alta) ───────────────── */
+.codeInput {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 8px;
+  text-align: center;
+  padding: 12px 10px;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color .18s;
+}
+.codeInput:focus { border-color: var(--gold); }
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: var(--gold-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  padding: 4px;
+  text-decoration: underline;
+}
+.linkBtn:hover { opacity: .85; }
+
+.instructions {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  padding-left: 20px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qrWrap {
+  display: flex;
+  justify-content: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+.qrWrap img { width: 180px; height: 180px; }
+
+.secretRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.secretRow code {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  letter-spacing: .5px;
+  word-break: break-all;
+}
+.secretRow button {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--gold-text);
+  font-size: 11.5px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+.secretRow button:hover { border-color: var(--gold); }
+
+.backupList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.backupItem {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: monospace;
+  text-align: center;
+  letter-spacing: .5px;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.checkboxRow input { width: 16px; height: 16px; cursor: pointer; }
+
 /* ── Footer ───────────────────────────────────────────────── */
 .foot { font-size: 11.5px; color: var(--muted-faint); text-align: center; }
 
