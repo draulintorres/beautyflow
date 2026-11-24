@@ -73,11 +73,17 @@ function mensajeDeError(err: unknown, fallback: string): { status?: number; mens
  * causas muy distintas: el CÓDIGO está mal (quedarse en el mismo paso, con
  * un mensaje genérico) o el TOKEN DE DESAFÍO venció/es inválido (volver al
  * paso 1 -- no tiene sentido seguir pidiendo un código para un desafío que
- * el servidor ya no reconoce). El backend distingue ambos casos en el
- * texto del mensaje ("Token de desafío..." vs "Código incorrecto...").
- */
+ * el servidor ya no reconoce). El backend (verificarChallenge() en
+ * superadmin-totp.service.ts) solo usa estos 2 mensajes exactos para esa
+ * segunda causa -- comparación exacta, no una palabra suelta, para que un
+ * cambio futuro de texto rompa esto de forma ruidosa (ya no detecta nada)
+ * en vez de silenciosa (detecta de más por una coincidencia parcial). */
+const MENSAJES_CHALLENGE_INVALIDO = new Set([
+  'Token de desafío inválido o expirado.',
+  'Token de desafío inválido.',
+]);
 function esChallengeVencido(mensaje: string): boolean {
-  return /desaf[ií]o/i.test(mensaje);
+  return MENSAJES_CHALLENGE_INVALIDO.has(mensaje);
 }
 
 export function SALoginPage() {
@@ -132,13 +138,36 @@ export function SALoginPage() {
     if (paso === 'codigo') codigoInputRef.current?.focus();
   }, [paso, usarRespaldo]);
 
+  // Vuelve al paso 1 y limpia TODO el estado del flujo (código y alta) --
+  // así, si el admin vuelve a llegar a la pantalla de alta después de esto
+  // (ej. challenge vencido durante la alta), altaIniciadaRef en false
+  // obliga a pedir un QR nuevo en vez de reusar uno viejo o un secreto que
+  // ya no coincide con lo que el servidor tiene pendiente.
   function volverAPaso1(mensaje: string) {
     setChallengeToken(null);
+    setLoading(false);
+    setError(mensaje);
+    setPaso('credenciales');
+
+    // paso 2 (código)
     setCodigo('');
     setCodigoRespaldo('');
     setUsarRespaldo(false);
-    setPaso('credenciales');
-    setError(mensaje);
+
+    // paso 3 (alta)
+    altaIniciadaRef.current = false;
+    setQr(null);
+    setSecretoManual(null);
+    setCodigoAlta('');
+    setCodigosRespaldo(null);
+    setConfirmoGuardado(false);
+    setCopiado(null);
+    // sessionDataPendienteRef NO se toca acá: solo se llena tras un
+    // confirmarAlta exitoso, momento en el que ya se pasó a la pantalla de
+    // códigos de respaldo -- desde ahí no hay ningún camino de vuelta a
+    // volverAPaso1 (ese paso ya no vuelve a llamar a ningún endpoint que
+    // pueda fallar con un challenge vencido), así que en todo punto donde
+    // volverAPaso1 sí se invoca, esta ref ya está en null por construcción.
   }
 
   async function handleSubmitCodigo(e: FormEvent) {
