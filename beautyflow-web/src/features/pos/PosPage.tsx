@@ -236,6 +236,8 @@ export function PosPage() {
       limpiarVenta();
       qc.invalidateQueries({ queryKey: ['facturas'] });
       qc.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-graficas'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-rankings'] });
       qc.invalidateQueries({ queryKey: ['caja-resumen'] });
       qc.invalidateQueries({ queryKey: ['citas'] });
     },
@@ -269,6 +271,8 @@ export function PosPage() {
       setAnulando(null); setMotivoAnular(''); setPinAnular(''); setErrAnular(null);
       qc.invalidateQueries({ queryKey: ['facturas'] });
       qc.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-graficas'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-rankings'] });
       qc.invalidateQueries({ queryKey: ['caja-resumen'] });
       qc.invalidateQueries({ queryKey: ['citas'] });
       qc.invalidateQueries({ queryKey: ['productos'] });
